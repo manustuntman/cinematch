@@ -57,6 +57,7 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
 
   return (
     <div 
+      onClick={() => onOpen(item)}
       style={{ 
         backgroundColor: 'rgba(24, 24, 27, 0.9)', 
         border: '1px solid rgba(255, 255, 255, 0.12)', 
@@ -65,10 +66,11 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
         display: 'flex', 
         flexDirection: 'column', 
         justifyContent: 'space-between',
-        boxShadow: '0 8px 20px rgba(0,0,0,0.5)'
+        boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
+        cursor: 'pointer'
       }}
     >
-      <div onClick={() => onOpen(item)} style={{ cursor: 'pointer' }}>
+      <div>
         <div style={{ position: 'relative' }}>
           <img 
             src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450'} 
@@ -85,7 +87,7 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
             {title}
           </h3>
 
-          <div style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)', borderRadius: '12px', padding: '8px', marginBottom: '8px' }}>
+          <div style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)', borderRadius: '12px', padding: '8px' }}>
             <span style={{ fontSize: '9px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
               ⚡ X-Ray Casting :
             </span>
@@ -100,31 +102,6 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
             )}
           </div>
         </div>
-      </div>
-
-      <div style={{ padding: '0 12px 12px 12px' }}>
-        <a
-          href={`https://open.spotify.com/search/${encodeURIComponent(title + ' soundtrack')}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            gap: '4px', 
-            backgroundColor: '#1DB954', 
-            color: '#000', 
-            textDecoration: 'none', 
-            fontSize: '10px', 
-            fontWeight: '800', 
-            padding: '6px 8px', 
-            borderRadius: '10px',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}
-        >
-          🎵 B.O. Spotify →
-        </a>
       </div>
     </div>
   );
@@ -904,6 +881,7 @@ export default function HomePage() {
                     </div>
                   </div>
 
+                  {/* BOUTON SPOTIFY EXCLUSIF X-RAY */}
                   <div style={{ marginBottom: '16px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '12px', borderRadius: '12px' }}>
                     <h4 style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '700', margin: '0 0 6px 0' }}>🎵 Bande Originale & Musique</h4>
                     <a
