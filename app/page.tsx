@@ -11,16 +11,12 @@ export default function HomePage() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // Ton Access Token TMDB v4
-      const TMDB_BEARER_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5MzM4OGE2MDM1Y2FlOTAzZWRjYjQwNTFlMWViNmU3YiIsIm5iZiI6MTc4NTMxMDQzNi41MzEwMDAxLCJzdWIiOiI2YTY5YWNlNDJjZmIxZmFkYWI3ODM3MjAiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.xIBYj1FjRv9R8GGsAqAITvKqwpbLvUcZqlttV3a_x8s'; 
+      // Ta clé API v3 TMDB
+      const API_KEY = '93388a6035cae903edcb4051e1eb6e7b'; 
       
-      const response = await fetch('https://api.themoviedb.org/3/movie/popular?language=fr-FR&page=1', {
-        method: 'GET',
-        headers: {
-          accept: 'application/json',
-          Authorization: `Bearer ${TMDB_BEARER_TOKEN}`
-        }
-      });
+      const response = await fetch(
+        `https://api.themoviedb.org/3/movie/popular?api_key=${API_KEY}&language=fr-FR&page=1`
+      );
       
       if (!response.ok) {
         throw new Error(`Erreur TMDB (Code ${response.status})`);
@@ -40,7 +36,7 @@ export default function HomePage() {
           overview: randomData.overview || "Aucun synopsis disponible en français pour ce film.",
         });
       } else {
-        throw new Error("Aucun film trouvé.");
+        throw new Error("Aucun résultat trouvé sur TMDB.");
       }
     } catch (error: any) {
       console.error("Erreur avec l'API TMDB :", error);
