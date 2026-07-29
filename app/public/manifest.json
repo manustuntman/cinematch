@@ -1,0 +1,21 @@
+{
+  "name": "CineMatch",
+  "short_name": "CineMatch",
+  "description": "Recommandations intelligentes de films et séries TV",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0A",
+  "theme_color": "#9333EA",
+  "icons": [
+    {
+      "src": "https://image.tmdb.org/t/p/w192/8N2uLFiSuLqT3H6qFhKxN9V7d3w.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://image.tmdb.org/t/p/w500/8N2uLFiSuLqT3H6qFhKxN9V7d3w.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
