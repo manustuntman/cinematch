@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
-const GENRES_LIST = [
+const GENRES_LIST_MOVIES = [
   { id: 878, name: 'Science-Fiction 🚀' },
   { id: 28, name: 'Action 💥' },
   { id: 53, name: 'Thriller 🔪' },
@@ -14,31 +14,43 @@ const GENRES_LIST = [
   { id: 9648, name: 'Mystère 🕵️' },
 ];
 
+const GENRES_LIST_TV = [
+  { id: 10765, name: 'Sci-Fi & Fantastique 🚀' },
+  { id: 10759, name: 'Action & Aventure 💥' },
+  { id: 80, name: 'Crime / Thriller 🔪' },
+  { id: 35, name: 'Comédie 😂' },
+  { id: 18, name: 'Drame 🎭' },
+  { id: 9648, name: 'Mystère 🕵️' },
+];
+
 const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩‍👦', 'Coup de cœur ❤️', 'À revoir 🔄'];
 
 export default function HomePage() {
+  const [mediaType, setMediaType] = useState<'movie' | 'tv'>('movie'); // 1. Sélecteur Films vs Séries
+  const [avoidHuisClos, setAvoidHuisClos] = useState<boolean>(false);   // 2. Filtre Anti-Huis Clos
+  const [searchQuery, setSearchQuery] = useState('');                 // 3. Barre de Recherche
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
   const [preferences, setPreferences] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
-  const [trendingMovies, setTrendingMovies] = useState<any[]>([]);
-  const [recommendedMovies, setRecommendedMovies] = useState<any[]>([]);
-  const [rouletteMovie, setRouletteMovie] = useState<any>(null);
+  const [trendingMedia, setTrendingMedia] = useState<any[]>([]);
+  const [recommendedMedia, setRecommendedMedia] = useState<any[]>([]);
+  const [rouletteMedia, setRouletteMedia] = useState<any>(null);
   const [isSpinning, setIsSpinning] = useState(false);
-  const [selectedMovieDetail, setSelectedMovieDetail] = useState<any>(null);
+  const [selectedMediaDetail, setSelectedMediaDetail] = useState<any>(null);
 
-  // Onglet actif dans la fiche (Infos principales VS X-Ray)
   const [activeTab, setActiveTab] = useState<'info' | 'xray'>('info');
 
-  // Données étendues X-Ray & Détails
-  const [movieDetailsExt, setMovieDetailsExt] = useState<{ 
+  // Détails étendus & X-Ray
+  const [mediaDetailsExt, setMediaDetailsExt] = useState<{ 
     director: string; 
     castWithRoles: { name: string; character: string; profile_path: string | null }[]; 
     providers: any[]; 
     freeProviders: any[]; 
     trailerKey: string | null;
     tagline: string;
-    runtime: number;
-    budget: number;
+    runtime: string;
   }>({
     director: '',
     castWithRoles: [],
@@ -46,8 +58,7 @@ export default function HomePage() {
     freeProviders: [],
     trailerKey: null,
     tagline: '',
-    runtime: 0,
-    budget: 0,
+    runtime: '',
   });
   const [loadingExt, setLoadingExt] = useState(false);
 
@@ -55,46 +66,71 @@ export default function HomePage() {
   const [userNotes, setUserNotes] = useState('');
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const fetchTrending = async () => {
+  // Recherche TMDB par titre
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
-      const url = `https://api.themoviedb.org/3/trending/movie/week?api_key=${API_KEY}&language=fr-FR`;
+      const url = `https://api.themoviedb.org/3/search/${mediaType}?api_key=${API_KEY}&language=fr-FR&query=${encodeURIComponent(query)}&page=1`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
-        setTrendingMovies(data.results.slice(0, 20));
+        setSearchResults(data.results.slice(0, 10));
       }
     } catch (err) {
       console.error(err);
     }
   };
 
+  // Charger les Tendances
+  const fetchTrending = async () => {
+    try {
+      const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
+      const url = `https://api.themoviedb.org/3/trending/${mediaType}/week?api_key=${API_KEY}&language=fr-FR`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.results) {
+        setTrendingMedia(data.results.slice(0, 20));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Recommandations selon genres & option anti-huis clos
   const fetchRecommendations = async (selectedGenres: number[]) => {
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       const genreQuery = selectedGenres.join(',');
-      const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc&page=1`;
+      // Mots clés exclus (ex: 10683 pour huis clos / claustrophobie si applicable)
+      const excludeParam = avoidHuisClos ? '&without_keywords=10683,235336' : '';
+      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc${excludeParam}&page=1`;
       
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
-        setRecommendedMovies(data.results.slice(0, 20));
+        setRecommendedMedia(data.results.slice(0, 20));
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  const fetchRandomMovie = async () => {
+  // Roulette Express avec anti-huis clos
+  const fetchRandomMedia = async () => {
     setIsSpinning(true);
-    setRouletteMovie(null);
+    setRouletteMedia(null);
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       const genreParam = preferences.length > 0 ? `&with_genres=${preferences.join(',')}` : '';
-      const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc${genreParam}&page=${Math.floor(Math.random() * 5) + 1}`;
+      const excludeParam = avoidHuisClos ? '&without_keywords=10683,235336' : '';
+      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc${genreParam}${excludeParam}&page=${Math.floor(Math.random() * 5) + 1}`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -102,7 +138,7 @@ export default function HomePage() {
       setTimeout(() => {
         if (data.results && data.results.length > 0) {
           const random = data.results[Math.floor(Math.random() * data.results.length)];
-          setRouletteMovie(random);
+          setRouletteMedia(random);
         }
         setIsSpinning(false);
       }, 800);
@@ -112,52 +148,55 @@ export default function HomePage() {
     }
   };
 
-  const fetchMovieExtraDetails = async (movieId: string | number) => {
+  // Détails étendus (Films vs Séries)
+  const fetchExtraDetails = async (id: string | number) => {
     setLoadingExt(true);
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       
-      // 1. Infos détaillées (Durée, tagline, budget)
-      const detailRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&language=fr-FR`);
+      const detailRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${API_KEY}&language=fr-FR`);
       const detailData = await detailRes.json();
 
-      // 2. Crédits (Réalisateur & Casting complet avec rôles pour le X-Ray)
-      const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${API_KEY}&language=fr-FR`);
+      const creditsRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}/credits?api_key=${API_KEY}&language=fr-FR`);
       const creditsData = await creditsRes.json();
       
-      const directorObj = creditsData.crew?.find((member: any) => member.job === 'Director');
+      const directorObj = mediaType === 'movie' 
+        ? creditsData.crew?.find((member: any) => member.job === 'Director')
+        : detailData.created_by?.[0];
+
       const directorName = directorObj ? directorObj.name : 'Non renseigné';
       const castWithRoles = creditsData.cast ? creditsData.cast.slice(0, 6).map((c: any) => ({
         name: c.name,
-        character: c.character,
+        character: c.character || c.roles?.[0]?.character || 'Rôle principal',
         profile_path: c.profile_path
       })) : [];
 
-      // 3. Streaming (Free & Flatrate)
-      const providersRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/watch/providers?api_key=${API_KEY}`);
+      const providersRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}/watch/providers?api_key=${API_KEY}`);
       const providersData = await providersRes.json();
       const frProviders = providersData.results?.FR || {};
 
-      // 4. Videos / Trailer
-      let videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=fr-FR`);
+      let videoRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}/videos?api_key=${API_KEY}&language=fr-FR`);
       let videoData = await videoRes.json();
-      let trailer = videoData.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
+      let trailer = videoData.results?.find((v: any) => (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube');
       
       if (!trailer) {
-        videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=en-US`);
+        videoRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}/videos?api_key=${API_KEY}&language=en-US`);
         videoData = await videoRes.json();
-        trailer = videoData.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
+        trailer = videoData.results?.find((v: any) => (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube');
       }
 
-      setMovieDetailsExt({
+      const runtimeStr = mediaType === 'movie' 
+        ? detailData.runtime ? `${Math.floor(detailData.runtime / 60)}h ${detailData.runtime % 60}m` : 'N/A'
+        : detailData.number_of_seasons ? `${detailData.number_of_seasons} saison(s)` : 'N/A';
+
+      setMediaDetailsExt({
         director: directorName,
         castWithRoles,
         providers: frProviders.flatrate || [],
         freeProviders: frProviders.free || [],
         trailerKey: trailer ? trailer.key : null,
         tagline: detailData.tagline || '',
-        runtime: detailData.runtime || 0,
-        budget: detailData.budget || 0,
+        runtime: runtimeStr,
       });
     } catch (err) {
       console.error(err);
@@ -165,13 +204,13 @@ export default function HomePage() {
     setLoadingExt(false);
   };
 
-  const openMovieModal = (movie: any) => {
-    setSelectedMovieDetail(movie);
+  const openMediaModal = (item: any) => {
+    setSelectedMediaDetail(item);
     setActiveTab('info');
     setUserNotes('');
     setUserRating(0);
     setSelectedTags([]);
-    fetchMovieExtraDetails(movie.id);
+    fetchExtraDetails(item.id);
   };
 
   const toggleTag = (tag: string) => {
@@ -182,27 +221,43 @@ export default function HomePage() {
     }
   };
 
+  // 4. Fonction de partage de fiche sous forme de texte / carte récapitulatif
+  const shareCard = () => {
+    if (!selectedMediaDetail) return;
+    const title = selectedMediaDetail.title || selectedMediaDetail.name;
+    const textToShare = `🎬 Mon avis sur "${title}" sur CineMatch :\nNote: ${'⭐'.repeat(userRating || 5)}\nAmbiance: ${selectedTags.join(', ')}\nRemarques: "${userNotes || 'À ne pas manquer !'}"`;
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(textToShare);
+      setFeedback('📋 Fiche copiée ! Prête à être partagée.');
+      setTimeout(() => setFeedback(null), 3000);
+    }
+  };
+
   const saveToSupabaseWithNotebook = async (status: 'to_watch' | 'watched') => {
-    if (!selectedMovieDetail) return;
+    if (!selectedMediaDetail) return;
     setFeedback(null);
+
+    const title = selectedMediaDetail.title || selectedMediaDetail.name;
 
     try {
       const { error } = await supabase.from('watchlist').insert([
         {
-          movie_id: selectedMovieDetail.id.toString(),
-          title: selectedMovieDetail.title,
-          poster_path: selectedMovieDetail.poster_path ? `https://image.tmdb.org/t/p/w500${selectedMovieDetail.poster_path}` : selectedMovieDetail.poster,
-          vote_average: parseFloat(selectedMovieDetail.vote_average || 0),
+          movie_id: selectedMediaDetail.id.toString(),
+          title: title,
+          poster_path: selectedMediaDetail.poster_path ? `https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}` : selectedMediaDetail.poster,
+          vote_average: parseFloat(selectedMediaDetail.vote_average || 0),
           status: status,
           user_notes: userNotes,
           user_rating: userRating,
-          user_tags: selectedTags
+          user_tags: selectedTags,
+          media_type: mediaType
         },
       ]);
 
       if (error) throw error;
       setFeedback(status === 'to_watch' ? '📌 Ajouté à la Watchlist !' : '👁️ Marqué comme vu !');
-      setSelectedMovieDetail(null);
+      setSelectedMediaDetail(null);
     } catch (err) {
       setFeedback(`⚠️ Erreur lors de la sauvegarde`);
     }
@@ -211,14 +266,16 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchTrending();
-  }, []);
+  }, [mediaType]);
+
+  const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
         {/* HEADER */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
             <h1 style={{ fontSize: '26px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
               CineMatch 🎬
@@ -227,7 +284,7 @@ export default function HomePage() {
 
           <a 
             href="/profile" 
-            title="Mon Profil & Espace Membre"
+            title="Mon Profil & XP"
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -236,36 +293,89 @@ export default function HomePage() {
               border: '1px solid rgba(255, 255, 255, 0.15)', 
               padding: '6px 12px 6px 6px', 
               borderRadius: '30px', 
-              textDecoration: 'none',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+              textDecoration: 'none'
             }}
           >
-            <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold' }}>
-              👤
-            </div>
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold' }}>👤</div>
             <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>Profil / XP</span>
           </a>
         </header>
 
-        {/* NAVIGATION */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-          {isSetupComplete && (
+        {/* BARRE DE RECHERCHE RAPIDE 🔍 */}
+        <div style={{ marginBottom: '16px', position: 'relative' }}>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder={`🔍 Rechercher un ${mediaType === 'movie' ? 'film' : 'série'}...`}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              borderRadius: '16px',
+              backgroundColor: 'rgba(24, 24, 27, 0.9)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#FFF',
+              fontSize: '13px',
+              outline: 'none',
+              boxSizing: 'border-box'
+            }}
+          />
+
+          {/* RÉSULTATS DE RECHERCHE DÉROULANTS */}
+          {searchResults.length > 0 && (
+            <div style={{ position: 'absolute', top: '50px', left: 0, width: '100%', backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '16px', zIndex: 500, maxHeight: '280px', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.8)' }}>
+              {searchResults.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => { openMediaModal(item); setSearchResults([]); setSearchQuery(''); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', cursor: 'pointer' }}
+                >
+                  <img src={item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : 'https://via.placeholder.com/40'} alt="" style={{ width: '36px', height: '50px', objectFit: 'cover', borderRadius: '6px' }} />
+                  <div>
+                    <h4 style={{ fontSize: '13px', margin: '0 0 2px 0', color: '#FFF' }}>{item.title || item.name}</h4>
+                    <span style={{ fontSize: '10px', color: '#A1A1AA' }}>★ {item.vote_average?.toFixed(1)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* BARRE DE COMMANDE (MODE FILMS VS SÉRIES + BOUTON WATCHLIST) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          {/* BOUTON BASCULE FILMS / SÉRIES */}
+          <div style={{ display: 'flex', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '3px', borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
             <button
-              onClick={() => setIsSetupComplete(false)}
+              onClick={() => { setMediaType('movie'); setPreferences([]); }}
               style={{
+                backgroundColor: mediaType === 'movie' ? '#9333EA' : 'transparent',
                 color: '#FFF',
-                fontSize: '12px',
-                fontWeight: '600',
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '16px',
+                fontSize: '11px',
+                fontWeight: '700',
                 cursor: 'pointer'
               }}
             >
-              🏠 Accueil
+              🎬 Films
             </button>
-          )}
+            <button
+              onClick={() => { setMediaType('tv'); setPreferences([]); }}
+              style={{
+                backgroundColor: mediaType === 'tv' ? '#9333EA' : 'transparent',
+                color: '#FFF',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '16px',
+                fontSize: '11px',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              📺 Séries TV
+            </button>
+          </div>
 
           <a href="/watchlist" style={{ color: '#C084FC', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(192, 132, 252, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(192, 132, 252, 0.2)' }}>
             📌 Ma Watchlist
@@ -281,13 +391,15 @@ export default function HomePage() {
         {/* CONTENU PRINCIPAL */}
         {!isSetupComplete ? (
           <div>
-            {/* 1. GENRES */}
-            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Quels sont tes genres préférés ? 🍿</h2>
-              <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Sélectionne tes catégories favorites.</p>
+            {/* 1. SELECTION DES GENRES + OPTION ANTI-HUIS CLOS */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '20px', textAlign: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '4px' }}>
+                Quels {mediaType === 'movie' ? 'genres de films' : 'types de séries'} aimes-tu ? 🍿
+              </h2>
+              <p style={{ fontSize: '11px', color: '#A1A1AA', marginBottom: '16px' }}>Sélectionne tes préférences pour adapter les choix.</p>
               
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '20px' }}>
-                {GENRES_LIST.map((g) => {
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '16px' }}>
+                {currentGenresList.map((g) => {
                   const selected = preferences.includes(g.id);
                   return (
                     <button
@@ -300,9 +412,9 @@ export default function HomePage() {
                         backgroundColor: selected ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
                         border: selected ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
                         color: '#FFFFFF',
-                        padding: '8px 14px',
+                        padding: '6px 12px',
                         borderRadius: '16px',
-                        fontSize: '12px',
+                        fontSize: '11px',
                         fontWeight: '600',
                         cursor: 'pointer'
                       }}
@@ -311,6 +423,20 @@ export default function HomePage() {
                     </button>
                   );
                 })}
+              </div>
+
+              {/* TOGGLE FILTRE ANTI-HUIS CLOS 🚫🏠 */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '8px', borderRadius: '12px' }}>
+                <input
+                  type="checkbox"
+                  id="huisClosToggle"
+                  checked={avoidHuisClos}
+                  onChange={(e) => setAvoidHuisClos(e.target.checked)}
+                  style={{ accentColor: '#9333EA', cursor: 'pointer' }}
+                />
+                <label htmlFor="huisClosToggle" style={{ fontSize: '11px', color: '#D4D4D8', cursor: 'pointer', fontWeight: '600' }}>
+                  🚫 Écarter les Huis Clos (espaces clos/confinés)
+                </label>
               </div>
 
               <button
@@ -327,15 +453,15 @@ export default function HomePage() {
                   padding: '12px',
                   borderRadius: '14px',
                   fontWeight: '700',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   cursor: preferences.length > 0 ? 'pointer' : 'not-allowed'
                 }}
               >
-                Découvrir mes recommandations ✨
+                Voir les recommandations ✨
               </button>
             </div>
 
-            {/* 2. ROULETTE */}
+            {/* 2. ROULETTE EXPRESS SURPRISE */}
             <div style={{ 
               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(236, 72, 153, 0.15))', 
               border: '1px solid rgba(192, 132, 252, 0.4)', 
@@ -346,33 +472,33 @@ export default function HomePage() {
               boxShadow: '0 10px 30px -5px rgba(147, 51, 234, 0.3)'
             }}>
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '2px', color: '#FBBF24', textTransform: 'uppercase' }}>
-                🎰 Mode Surprise
+                🎰 Mode Surprise ({mediaType === 'movie' ? 'Film' : 'Série'})
               </span>
               <h3 style={{ fontSize: '18px', fontWeight: '800', margin: '4px 0 12px 0', color: '#FFF' }}>
-                Tu ne sais pas quoi regarder ?
+                Laisse le hasard choisir pour toi !
               </h3>
 
               <button
-                onClick={fetchRandomMovie}
+                onClick={fetchRandomMedia}
                 disabled={isSpinning}
                 style={{
                   backgroundColor: isSpinning ? '#6B21A8' : '#FBBF24',
                   color: '#000',
                   border: 'none',
                   fontWeight: '800',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   padding: '12px 24px',
                   borderRadius: '16px',
                   cursor: 'pointer',
                   boxShadow: '0 4px 15px rgba(251, 191, 36, 0.4)'
                 }}
               >
-                {isSpinning ? '🎰 Tirage en cours...' : '💥 Lancer la Roulette !'}
+                {isSpinning ? '🎰 Tirage en cours...' : `💥 Lancer la Roulette (${mediaType === 'movie' ? 'Films' : 'Séries'})`}
               </button>
 
-              {rouletteMovie && !isSpinning && (
+              {rouletteMedia && !isSpinning && (
                 <div 
-                  onClick={() => openMovieModal(rouletteMovie)}
+                  onClick={() => openMediaModal(rouletteMedia)}
                   style={{ 
                     marginTop: '16px', 
                     backgroundColor: 'rgba(24, 24, 27, 0.9)', 
@@ -385,31 +511,31 @@ export default function HomePage() {
                     cursor: 'pointer' 
                   }}
                 >
-                  <img src={`https://image.tmdb.org/t/p/w500${rouletteMovie.poster_path}`} alt={rouletteMovie.title} style={{ width: '50px', height: '70px', objectFit: 'cover', borderRadius: '8px' }} />
+                  <img src={`https://image.tmdb.org/t/p/w500${rouletteMedia.poster_path}`} alt="" style={{ width: '50px', height: '70px', objectFit: 'cover', borderRadius: '8px' }} />
                   <div style={{ textAlign: 'left', flex: 1 }}>
                     <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>🎯 Résultat de la roulette :</span>
-                    <h4 style={{ fontSize: '14px', fontWeight: '700', margin: '2px 0 0 0', color: '#FFF' }}>{rouletteMovie.title}</h4>
+                    <h4 style={{ fontSize: '14px', fontWeight: '700', margin: '2px 0 0 0', color: '#FFF' }}>{rouletteMedia.title || rouletteMedia.name}</h4>
                     <p style={{ fontSize: '11px', color: '#C084FC', margin: '2px 0 0 0' }}>Clique pour voir la fiche complète →</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 3. TENDANCES */}
+            {/* 3. TENDANCES ACTUELLES */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
-                🔥 Tendances actuelles ({trendingMovies.length})
+                🔥 Tendances {mediaType === 'movie' ? 'Films' : 'Séries'} du moment ({trendingMedia.length})
               </h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
-                {trendingMovies.map((item) => (
+                {trendingMedia.map((item) => (
                   <div 
                     key={item.id} 
-                    onClick={() => openMovieModal(item)}
+                    onClick={() => openMediaModal(item)}
                     style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
                   >
-                    <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
+                    <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt="" style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
                     <div style={{ padding: '10px' }}>
-                      <h3 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
+                      <h3 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title || item.name}</h3>
                       <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {item.vote_average?.toFixed(1)}</span>
                     </div>
                   </div>
@@ -420,15 +546,20 @@ export default function HomePage() {
         ) : (
           /* RECOMMANDATIONS SUR-MESURE */
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px', color: '#C084FC' }}>
-              🎯 Recommandés selon tes choix ({recommendedMovies.length})
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#C084FC' }}>
+                🎯 Sélection pour toi
+              </h2>
+              <button onClick={() => setIsSetupComplete(false)} style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: '#FFF', border: 'none', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', cursor: 'pointer' }}>
+                ✏️ Modifier les filtres
+              </button>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
-              {recommendedMovies.map((item) => (
-                <div key={item.id} onClick={() => openMovieModal(item)} style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
-                  <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
+              {recommendedMedia.map((item) => (
+                <div key={item.id} onClick={() => openMediaModal(item)} style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
+                  <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt="" style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
                   <div style={{ padding: '10px' }}>
-                    <h3 style={{ fontSize: '11px', fontWeight: '700', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
+                    <h3 style={{ fontSize: '11px', fontWeight: '700', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title || item.name}</h3>
                     <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {item.vote_average?.toFixed(1)}</span>
                   </div>
                 </div>
@@ -437,14 +568,14 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MODALE FICHE FILM AVEC X-RAY ⚡ */}
-        {selectedMovieDetail && (
+        {/* MODALE FICHE FILM / SÉRIE AVEC X-RAY ⚡ ET CARTE DE PARTAGE 📤 */}
+        {selectedMediaDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
               
-              <button onClick={() => setSelectedMovieDetail(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700', zIndex: 10 }}>✕</button>
+              <button onClick={() => setSelectedMediaDetail(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700', zIndex: 10 }}>✕</button>
 
-              {/* BARRE D'ONGLETS : INFOS VS X-RAY */}
+              {/* ONGLETS : INFOS VS X-RAY */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '10px' }}>
                 <button
                   onClick={() => setActiveTab('info')}
@@ -459,7 +590,7 @@ export default function HomePage() {
                     cursor: 'pointer'
                   }}
                 >
-                  🎬 Fiche Film
+                  🎬 Fiche {mediaType === 'movie' ? 'Film' : 'Série'}
                 </button>
                 <button
                   onClick={() => setActiveTab('xray')}
@@ -485,27 +616,25 @@ export default function HomePage() {
               {activeTab === 'info' && (
                 <div>
                   <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                    <img src={`https://image.tmdb.org/t/p/w500${selectedMovieDetail.poster_path}`} alt={selectedMovieDetail.title} style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
+                    <img src={`https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}`} alt="" style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
                     <div style={{ flex: 1 }}>
-                      <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 4px 0' }}>{selectedMovieDetail.title}</h2>
+                      <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 4px 0' }}>{selectedMediaDetail.title || selectedMediaDetail.name}</h2>
                       <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '8px', display: 'inline-block', marginBottom: '8px' }}>
-                        ★ {selectedMovieDetail.vote_average?.toFixed(1)} / 10 (TMDB)
+                        ★ {selectedMediaDetail.vote_average?.toFixed(1)} / 10
                       </span>
                       
                       <p style={{ fontSize: '11px', color: '#A1A1AA', margin: '0 0 4px 0' }}>
-                        <strong style={{ color: '#FFF' }}>Réalisateur :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.director || 'N/A'}
+                        <strong style={{ color: '#FFF' }}>Créateur/Réal :</strong> {loadingExt ? 'Chargement...' : mediaDetailsExt.director || 'N/A'}
                       </p>
 
-                      {movieDetailsExt.runtime > 0 && (
-                        <p style={{ fontSize: '11px', color: '#A1A1AA', margin: 0 }}>
-                          <strong style={{ color: '#FFF' }}>Durée :</strong> {Math.floor(movieDetailsExt.runtime / 60)}h {movieDetailsExt.runtime % 60}m
-                        </p>
-                      )}
+                      <p style={{ fontSize: '11px', color: '#A1A1AA', margin: 0 }}>
+                        <strong style={{ color: '#FFF' }}>Format :</strong> {mediaDetailsExt.runtime || 'N/A'}
+                      </p>
                     </div>
                   </div>
 
                   <p style={{ fontSize: '12px', color: '#D4D4D8', lineHeight: '1.5', margin: '0 0 16px 0' }}>
-                    {selectedMovieDetail.overview}
+                    {selectedMediaDetail.overview}
                   </p>
 
                   {/* STREAMING */}
@@ -517,13 +646,13 @@ export default function HomePage() {
                       <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Recherche des disponibilités...</span>
                     ) : (
                       <div>
-                        {movieDetailsExt.freeProviders.length > 0 && (
+                        {mediaDetailsExt.freeProviders.length > 0 && (
                           <div style={{ marginBottom: '8px' }}>
                             <span style={{ fontSize: '10px', color: '#4ADE80', fontWeight: '700', display: 'block', marginBottom: '4px' }}>🎁 Gratuit / Replay :</span>
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                              {movieDetailsExt.freeProviders.map((provider: any) => (
+                              {mediaDetailsExt.freeProviders.map((provider: any) => (
                                 <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.2)', padding: '4px 8px', borderRadius: '8px' }}>
-                                  <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+                                  <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt="" style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
                                   <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
                                 </div>
                               ))}
@@ -531,13 +660,13 @@ export default function HomePage() {
                           </div>
                         )}
 
-                        {movieDetailsExt.providers.length > 0 && (
+                        {mediaDetailsExt.providers.length > 0 && (
                           <div>
                             <span style={{ fontSize: '10px', color: '#C084FC', fontWeight: '700', display: 'block', marginBottom: '4px' }}>✨ Abonnement :</span>
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                              {movieDetailsExt.providers.map((provider: any) => (
+                              {mediaDetailsExt.providers.map((provider: any) => (
                                 <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px 8px', borderRadius: '8px' }}>
-                                  <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+                                  <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt="" style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
                                   <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
                                 </div>
                               ))}
@@ -545,11 +674,11 @@ export default function HomePage() {
                           </div>
                         )}
 
-                        {movieDetailsExt.freeProviders.length === 0 && movieDetailsExt.providers.length === 0 && (
+                        {mediaDetailsExt.freeProviders.length === 0 && mediaDetailsExt.providers.length === 0 && (
                           <div>
-                            <span style={{ fontSize: '11px', color: '#FBBF24', fontWeight: '700', display: 'block', marginBottom: '8px' }}>🍿 Actuellement au cinéma !</span>
-                            <a href={`https://www.google.com/search?q=seance+cinema+${encodeURIComponent(selectedMovieDetail.title)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#9333EA', color: '#FFF', textDecoration: 'none', fontSize: '11px', fontWeight: '700', padding: '8px 12px', borderRadius: '10px' }}>
-                              📍 Voir les séances près de chez moi →
+                            <span style={{ fontSize: '11px', color: '#FBBF24', fontWeight: '700', display: 'block', marginBottom: '8px' }}>🍿 Au cinéma ou en diffusion TV !</span>
+                            <a href={`https://www.google.com/search?q=seance+${encodeURIComponent(selectedMediaDetail.title || selectedMediaDetail.name)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#9333EA', color: '#FFF', textDecoration: 'none', fontSize: '11px', fontWeight: '700', padding: '8px 12px', borderRadius: '10px' }}>
+                              📍 Chercher les séances près de chez moi →
                             </a>
                           </div>
                         )}
@@ -557,12 +686,12 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  {/* TRAILER YOUTUBE */}
+                  {/* TRAILER */}
                   <div style={{ marginBottom: '20px' }}>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>🎬 Bande-annonce :</span>
-                    {movieDetailsExt.trailerKey ? (
+                    {mediaDetailsExt.trailerKey ? (
                       <div style={{ position: 'relative', width: '100%', height: '200px', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                        <iframe src={`https://www.youtube.com/embed/${movieDetailsExt.trailerKey}`} title="Trailer" style={{ width: '100%', height: '100%', border: 'none' }} allowFullScreen />
+                        <iframe src={`https://www.youtube.com/embed/${mediaDetailsExt.trailerKey}`} title="Trailer" style={{ width: '100%', height: '100%', border: 'none' }} allowFullScreen />
                       </div>
                     ) : (
                       <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Aucune vidéo disponible.</span>
@@ -575,43 +704,34 @@ export default function HomePage() {
               {activeTab === 'xray' && (
                 <div>
                   <div style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '16px', padding: '12px', marginBottom: '16px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                      ⚡ Mode X-Ray Actif
-                    </span>
-                    <h3 style={{ fontSize: '15px', fontWeight: '800', margin: '4px 0 2px 0' }}>{selectedMovieDetail.title}</h3>
-                    {movieDetailsExt.tagline && <p style={{ fontSize: '11px', color: '#A1A1AA', italic: 'true', margin: 0 }}>« {movieDetailsExt.tagline} »</p>}
+                    <span style={{ fontSize: '10px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase', letterSpacing: '1px' }}>⚡ Mode X-Ray Actif</span>
+                    <h3 style={{ fontSize: '15px', fontWeight: '800', margin: '4px 0 2px 0' }}>{selectedMediaDetail.title || selectedMediaDetail.name}</h3>
+                    {mediaDetailsExt.tagline && <p style={{ fontSize: '11px', color: '#A1A1AA', italic: 'true', margin: 0 }}>« {mediaDetailsExt.tagline} »</p>}
                   </div>
 
-                  {/* CASTING DÉTAILLÉ AVEC RÔLES (X-RAY CAST) */}
                   <div style={{ marginBottom: '16px' }}>
-                    <h4 style={{ fontSize: '12px', color: '#C084FC', fontWeight: '700', margin: '0 0 10px 0', textTransform: 'uppercase' }}>
-                      🎭 Acteurs & Personnages
-                    </h4>
+                    <h4 style={{ fontSize: '12px', color: '#C084FC', fontWeight: '700', margin: '0 0 10px 0', textTransform: 'uppercase' }}>🎭 Acteurs & Rôles</h4>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      {movieDetailsExt.castWithRoles.map((actor, idx) => (
+                      {mediaDetailsExt.castWithRoles.map((actor, idx) => (
                         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '6px', borderRadius: '10px' }}>
                           {actor.profile_path ? (
-                            <img src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} alt={actor.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                            <img src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
                           ) : (
                             <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#3F3F46', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>👤</div>
                           )}
                           <div style={{ overflow: 'hidden' }}>
                             <span style={{ fontSize: '11px', fontWeight: '700', color: '#FFF', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actor.name}</span>
-                            <span style={{ fontSize: '10px', color: '#A1A1AA', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actor.character || 'Rôle inconnu'}</span>
+                            <span style={{ fontSize: '10px', color: '#A1A1AA', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actor.character}</span>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* BANDE ORIGINALE & MUSIQUE (X-RAY MUSIC) */}
                   <div style={{ marginBottom: '16px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '12px', borderRadius: '12px' }}>
-                    <h4 style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '700', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      🎵 Bande Originale & Musiques
-                    </h4>
-                    <p style={{ fontSize: '11px', color: '#D4D4D8', margin: '0 0 8px 0' }}>Écoute la B.O. complète du film sur Spotify ou YouTube :</p>
+                    <h4 style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '700', margin: '0 0 6px 0' }}>🎵 Bande Originale & Musique</h4>
                     <a
-                      href={`https://open.spotify.com/search/${encodeURIComponent(selectedMovieDetail.title + ' soundtrack')}`}
+                      href={`https://open.spotify.com/search/${encodeURIComponent((selectedMediaDetail.title || selectedMediaDetail.name) + ' soundtrack')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#1DB954', color: '#000', textDecoration: 'none', fontSize: '11px', fontWeight: '800', padding: '6px 12px', borderRadius: '8px' }}
@@ -622,14 +742,18 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* CARNET DE BORD (TOUJOURS ACCESSIBLE) */}
+              {/* CARNET DE BORD & ACTIONS */}
               <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  📓 Mon Carnet de Bord
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', margin: 0 }}>📓 Mon Carnet de Bord</h3>
+                  {/* BOUTON PARTAGER LA FICHE 📤 */}
+                  <button onClick={shareCard} style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: '#FFF', border: 'none', padding: '4px 10px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}>
+                    📤 Partager
+                  </button>
+                </div>
 
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Ma Note Personnelle :</label>
+                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Ma Note :</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
@@ -644,7 +768,7 @@ export default function HomePage() {
                 </div>
 
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Contexte & Ambiance :</label>
+                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Ambiance :</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {AVAILABLE_TAGS.map((tag) => {
                       const active = selectedTags.includes(tag);
@@ -674,7 +798,7 @@ export default function HomePage() {
                   <textarea
                     value={userNotes}
                     onChange={(e) => setUserNotes(e.target.value)}
-                    placeholder="Écris ce que tu as pensé du film..."
+                    placeholder="Écris ce que tu as pensé..."
                     style={{
                       width: '100%',
                       height: '70px',
