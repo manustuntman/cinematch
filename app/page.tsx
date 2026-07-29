@@ -15,18 +15,18 @@ const GENRES_LIST = [
 ];
 
 export default function HomePage() {
-  // État du questionnaire et préférences
   const [preferences, setPreferences] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
-  // Films et UI
   const [recommendedMovies, setRecommendedMovies] = useState<any[]>([]);
   const [rouletteMovie, setRouletteMovie] = useState<any>(null);
+  const [selectedMovieDetail, setSelectedMovieDetail] = useState<any>(null); // Film actuellement ouvert en grand
+
   const [mode, setMode] = useState<'recommendations' | 'roulette'>('recommendations');
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // 1. Charger les recommandations selon les genres choisis
+  // Charger les recommandations
   const fetchRecommendations = async (selectedGenres: number[]) => {
     setLoading(true);
     try {
@@ -38,7 +38,7 @@ export default function HomePage() {
       const data = await res.json();
 
       if (data.results) {
-        setRecommendedMovies(data.results.slice(0, 8)); // Top 8 recommandations
+        setRecommendedMovies(data.results.slice(0, 10));
       }
     } catch (err) {
       console.error(err);
@@ -46,7 +46,7 @@ export default function HomePage() {
     setLoading(false);
   };
 
-  // 2. Lancer la roulette
+  // Lancer la roulette
   const fetchRandomMovie = async () => {
     setLoading(true);
     try {
@@ -61,10 +61,10 @@ export default function HomePage() {
         setRouletteMovie({
           id: random.id.toString(),
           title: random.title,
-          year: random.release_date ? random.release_date.substring(0, 4) : 'N/A',
-          rating: random.vote_average ? random.vote_average.toFixed(1) : 'N/A',
-          poster: random.poster_path ? `https://image.tmdb.org/t/p/w500${random.poster_path}` : '',
-          overview: random.overview || "Aucun synopsis disponible.",
+          release_date: random.release_date,
+          vote_average: random.vote_average,
+          poster_path: random.poster_path,
+          overview: random.overview || "Aucun synopsis disponible en français.",
         });
       }
     } catch (err) {
@@ -73,7 +73,6 @@ export default function HomePage() {
     setLoading(false);
   };
 
-  // Basculer la sélection d'un genre
   const toggleGenre = (id: number) => {
     if (preferences.includes(id)) {
       setPreferences(preferences.filter(g => g !== id));
@@ -82,7 +81,6 @@ export default function HomePage() {
     }
   };
 
-  // Valider le questionnaire
   const handleSavePreferences = () => {
     if (preferences.length === 0) return;
     setIsSetupComplete(true);
@@ -90,7 +88,6 @@ export default function HomePage() {
     fetchRecommendations(preferences);
   };
 
-  // Sauvegarder dans Supabase
   const saveToSupabase = async (movieItem: any, status: 'to_watch' | 'watched') => {
     setFeedback(null);
     try {
@@ -99,14 +96,14 @@ export default function HomePage() {
           movie_id: movieItem.id.toString(),
           title: movieItem.title,
           poster_path: movieItem.poster_path ? `https://image.tmdb.org/t/p/w500${movieItem.poster_path}` : movieItem.poster,
-          vote_average: parseFloat(movieItem.vote_average || movieItem.rating || 0),
+          vote_average: parseFloat(movieItem.vote_average || 0),
           status: status,
         },
       ]);
       if (error) throw error;
-      setFeedback(`Ajouté à ta liste !`);
+      setFeedback(status === 'to_watch' ? '📌 Ajouté à la Watchlist !' : '👁️ Marqué comme vu !');
     } catch (err) {
-      setFeedback(`Déjà dans ta liste`);
+      setFeedback(`⚠️ Déjà enregistré`);
     }
     setTimeout(() => setFeedback(null), 3000);
   };
@@ -130,16 +127,16 @@ export default function HomePage() {
         </div>
 
         {feedback && (
-          <div style={{ position: 'fixed', bottom: '20px', right: '20px', backgroundColor: '#9333EA', color: '#FFF', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', zIndex: 100 }}>
+          <div style={{ position: 'fixed', bottom: '20px', right: '20px', backgroundColor: '#9333EA', color: '#FFF', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', zIndex: 1000 }}>
             {feedback}
           </div>
         )}
 
-        {/* --- ÉTAPE 1 : QUESTIONNAIRE DE GOÛTS --- */}
+        {/* ÉTAPE 1 : QUESTIONNAIRE GOÛTS */}
         {!isSetupComplete ? (
           <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center' }}>
             <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Quels sont tes genres préférés ? 🍿</h2>
-            <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Sélectionne un ou plusieurs genres pour qu'on prépare tes recommandations.</p>
+            <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Sélectionne tes catégories favorites.</p>
             
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
               {GENRES_LIST.map((g) => {
@@ -184,7 +181,7 @@ export default function HomePage() {
             </button>
           </div>
         ) : (
-          /* --- ÉTAPE 2 : ACCUEIL PERSONNALISÉ --- */
+          /* ÉTAPE 2 : ACCUEIL PERSONNALISÉ */
           <div>
             {/* Mode Switcher */}
             <div style={{ display: 'flex', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px', borderRadius: '16px', marginBottom: '20px' }}>
@@ -203,21 +200,25 @@ export default function HomePage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <span style={{ fontSize: '12px', color: '#A1A1AA' }}>Basé sur tes critères</span>
+              <span style={{ fontSize: '12px', color: '#A1A1AA' }}>Basé sur tes préférences</span>
               <button onClick={() => setIsSetupComplete(false)} style={{ background: 'none', border: 'none', color: '#C084FC', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}>
                 ✏️ Modifier mes goûts
               </button>
             </div>
 
-            {/* VUE 1 : RECOMMANDATIONS SUR-MESURE */}
+            {/* RECOMMANDATIONS */}
             {mode === 'recommendations' && (
               <div>
                 {loading ? (
-                  <p style={{ textAlign: 'center', color: '#A1A1AA', padding: '40px 0' }}>Analyse de tes goûts en cours...</p>
+                  <p style={{ textAlign: 'center', color: '#A1A1AA', padding: '40px 0' }}>Analyse des meilleurs films pour toi...</p>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '16px' }}>
                     {recommendedMovies.map((item) => (
-                      <div key={item.id} style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                      <div 
+                        key={item.id} 
+                        onClick={() => setSelectedMovieDetail(item)}
+                        style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'transform 0.2s' }}
+                      >
                         <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title} style={{ width: '100%', height: '190px', objectFit: 'cover' }} />
                         <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
                           <div>
@@ -225,8 +226,8 @@ export default function HomePage() {
                             <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {item.vote_average?.toFixed(1)}</span>
                           </div>
                           <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
-                            <button onClick={() => saveToSupabase(item, 'watched')} style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', fontSize: '10px', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}>👁️</button>
-                            <button onClick={() => saveToSupabase(item, 'to_watch')} style={{ flex: 1, backgroundColor: '#9333EA', color: '#FFF', border: 'none', fontSize: '10px', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}>📌</button>
+                            <button onClick={(e) => { e.stopPropagation(); saveToSupabase(item, 'watched'); }} style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', fontSize: '10px', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}>👁️</button>
+                            <button onClick={(e) => { e.stopPropagation(); saveToSupabase(item, 'to_watch'); }} style={{ flex: 1, backgroundColor: '#9333EA', color: '#FFF', border: 'none', fontSize: '10px', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}>📌</button>
                           </div>
                         </div>
                       </div>
@@ -236,17 +237,17 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* VUE 2 : MODE ROULETTE EXPRESS */}
+            {/* ROULETTE */}
             {mode === 'roulette' && (
               <div style={{ maxWidth: '360px', margin: '0 auto', backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '20px' }}>
                 {loading || !rouletteMovie ? (
                   <div style={{ textAlign: 'center', padding: '40px 0', color: '#A1A1AA' }}>⏳ Tirage au sort...</div>
                 ) : (
                   <>
-                    <div style={{ height: '260px', borderRadius: '16px', overflow: 'hidden', marginBottom: '16px' }}>
-                      <img src={rouletteMovie.poster} alt={rouletteMovie.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div onClick={() => setSelectedMovieDetail(rouletteMovie)} style={{ height: '260px', borderRadius: '16px', overflow: 'hidden', marginBottom: '16px', cursor: 'pointer' }}>
+                      <img src={`https://image.tmdb.org/t/p/w500${rouletteMovie.poster_path}`} alt={rouletteMovie.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
-                    <h2 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 6px 0' }}>{rouletteMovie.title} <span style={{ fontSize: '13px', color: '#A1A1AA' }}>({rouletteMovie.year})</span></h2>
+                    <h2 onClick={() => setSelectedMovieDetail(rouletteMovie)} style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 6px 0', cursor: 'pointer' }}>{rouletteMovie.title} <span style={{ fontSize: '13px', color: '#A1A1AA' }}>({rouletteMovie.release_date?.substring(0, 4)})</span></h2>
                     <p style={{ fontSize: '12px', color: '#D4D4D8', lineHeight: '1.4', marginBottom: '16px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rouletteMovie.overview}</p>
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                       <button onClick={() => saveToSupabase(rouletteMovie, 'watched')} style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', padding: '10px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>👁️ Vu</button>
@@ -259,6 +260,58 @@ export default function HomePage() {
             )}
           </div>
         )}
+
+        {/* MODALE DETAILED FICHE FILM */}
+        {selectedMovieDetail && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 999 }}>
+            <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '420px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
+              
+              {/* Bouton Fermer */}
+              <button 
+                onClick={() => setSelectedMovieDetail(null)}
+                style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700' }}
+              >
+                ✕
+              </button>
+
+              <div style={{ height: '300px', borderRadius: '16px', overflow: 'hidden', marginBottom: '16px' }}>
+                <img src={`https://image.tmdb.org/t/p/w500${selectedMovieDetail.poster_path}`} alt={selectedMovieDetail.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24', fontSize: '12px', fontWeight: '700', padding: '4px 10px', borderRadius: '12px' }}>
+                  ★ {selectedMovieDetail.vote_average?.toFixed(1)} / 10
+                </span>
+                <span style={{ fontSize: '12px', color: '#A1A1AA' }}>
+                  {selectedMovieDetail.release_date?.substring(0, 4)}
+                </span>
+              </div>
+
+              <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 12px 0' }}>{selectedMovieDetail.title}</h2>
+              
+              <h4 style={{ fontSize: '12px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 6px 0' }}>Synopsis</h4>
+              <p style={{ fontSize: '13px', color: '#D4D4D8', lineHeight: '1.6', margin: '0 0 20px 0' }}>
+                {selectedMovieDetail.overview || "Aucun synopsis disponible."}
+              </p>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  onClick={() => { saveToSupabase(selectedMovieDetail, 'watched'); setSelectedMovieDetail(null); }}
+                  style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  👁️ Marquer comme Vu
+                </button>
+                <button 
+                  onClick={() => { saveToSupabase(selectedMovieDetail, 'to_watch'); setSelectedMovieDetail(null); }}
+                  style={{ flex: 1, backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  📌 Ajouter Watchlist
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </main>
   );
