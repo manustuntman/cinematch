@@ -146,6 +146,8 @@ export default function HomePage() {
   const [selectedMediaDetail, setSelectedMediaDetail] = useState<any>(null);
 
   const [activeTab, setActiveTab] = useState<'info' | 'xray'>('info');
+  const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>('');
 
   const [mediaDetailsExt, setMediaDetailsExt] = useState<{ 
     director: string; 
@@ -170,6 +172,15 @@ export default function HomePage() {
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  const fetchUserPlaylists = async () => {
+    try {
+      const { data } = await supabase.from('playlists').select('*');
+      if (data) setUserPlaylists(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const getExcludedKeywordsString = () => {
     return selectedAversions
@@ -319,6 +330,7 @@ export default function HomePage() {
     setUserRating(0);
     setSelectedTags([]);
     fetchExtraDetails(item.id);
+    fetchUserPlaylists();
   };
 
   const toggleTag = (tag: string) => {
@@ -366,6 +378,30 @@ export default function HomePage() {
       setSelectedMediaDetail(null);
     } catch (err) {
       setFeedback(`⚠️ Erreur lors de la sauvegarde`);
+    }
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const addToPlaylist = async () => {
+    if (!selectedPlaylistId || !selectedMediaDetail) return;
+    try {
+      const targetPl = userPlaylists.find(p => p.id === selectedPlaylistId);
+      if (!targetPl) return;
+
+      const updatedItems = [...(targetPl.items || []), {
+        id: selectedMediaDetail.id,
+        title: selectedMediaDetail.title || selectedMediaDetail.name,
+        poster_path: selectedMediaDetail.poster_path,
+        media_type: mediaType
+      }];
+
+      const { error } = await supabase.from('playlists').update({ items: updatedItems }).eq('id', selectedPlaylistId);
+      if (error) throw error;
+
+      setFeedback(`🎵 Ajouté à la playlist "${targetPl.title}" !`);
+      setSelectedPlaylistId('');
+    } catch (err) {
+      setFeedback('⚠️ Erreur ajout playlist');
     }
     setTimeout(() => setFeedback(null), 3000);
   };
@@ -427,7 +463,6 @@ export default function HomePage() {
             }}
           />
 
-          {/* RÉSULTATS DÉROULANTS */}
           {searchResults.length > 0 && (
             <div style={{ position: 'absolute', top: '50px', left: 0, width: '100%', backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '16px', zIndex: 500, maxHeight: '280px', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.8)' }}>
               {searchResults.map((item) => (
@@ -447,7 +482,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* NAVIGATION SECONDAIRE AVEC BOUTON RETOUR ET PLAYLISTS */}
+        {/* NAVIGATION SECONDAIRE */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           {isSetupComplete ? (
             <button
@@ -490,7 +525,6 @@ export default function HomePage() {
           <div>
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '24px' }}>
               
-              {/* 1. CHOIX DU FORMAT */}
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 1 sur 3</span>
               <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>Que veux-tu regarder aujourd'hui ? 🍿</h2>
               
@@ -529,7 +563,6 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* 2. SELECTION DES GENRES */}
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 2 sur 3</span>
               <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>Tes genres préférés :</h3>
               
@@ -560,7 +593,6 @@ export default function HomePage() {
                 })}
               </div>
 
-              {/* 3. FILTRES D'AVERSIONS & PHOBIES */}
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#EF4444', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 3 sur 3 (Optionnel)</span>
               <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: '#F87171' }}>Écarter ce que tu N'AIMES PAS :</h3>
               <p style={{ fontSize: '11px', color: '#A1A1AA', marginBottom: '12px' }}>Sélectionne tes phobies ou éléments à exclure.</p>
@@ -674,7 +706,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* TENDANCES AVEC CARTES X-RAY */}
+            {/* TENDANCES */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
                 🔥 Tendances {mediaType === 'movie' ? 'Films' : 'Séries'} ({trendingMedia.length})
@@ -886,6 +918,33 @@ export default function HomePage() {
                 </div>
               )}
 
+              {/* SECTEUR AJOUT PLAYLIST */}
+              {userPlaylists.length > 0 && (
+                <div style={{ marginBottom: '16px', backgroundColor: 'rgba(251, 191, 36, 0.05)', border: '1px solid rgba(251, 191, 36, 0.15)', padding: '10px', borderRadius: '12px' }}>
+                  <label style={{ fontSize: '11px', color: '#FBBF24', fontWeight: '700', display: 'block', marginBottom: '6px' }}>🎵 Ajouter à une Playlist :</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <select
+                      value={selectedPlaylistId}
+                      onChange={(e) => setSelectedPlaylistId(e.target.value)}
+                      style={{ flex: 1, backgroundColor: '#18181B', color: '#FFF', border: '1px solid rgba(255,255,255,0.2)', padding: '6px', borderRadius: '8px', fontSize: '11px' }}
+                    >
+                      <option value="">-- Choisir une playlist --</option>
+                      {userPlaylists.map(pl => (
+                        <option key={pl.id} value={pl.id}>{pl.icon} {pl.title}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={addToPlaylist}
+                      disabled={!selectedPlaylistId}
+                      style={{ backgroundColor: selectedPlaylistId ? '#FBBF24' : '#3F3F46', color: '#000', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: selectedPlaylistId ? 'pointer' : 'not-allowed' }}
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CARNET DE BORD & ACTIONS */}
               <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', margin: 0 }}>📓 Mon Carnet de Bord</h3>
