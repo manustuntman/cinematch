@@ -23,7 +23,6 @@ const GENRES_LIST_TV = [
   { id: 9648, name: 'Mystère 🕵️' },
 ];
 
-// Liste des Aversions & Phobies à exclure avec leurs IDs de keywords TMDB
 const AVERSIONS_LIST = [
   { id: 10683, keyword: '10683,235336', name: '🚫 Huis clos / Espaces clos' },
   { id: 3047, keyword: '3047,12615', name: '🕷️ Araignées' },
@@ -33,6 +32,106 @@ const AVERSIONS_LIST = [
 ];
 
 const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩‍👦', 'Coup de cœur ❤️', 'À revoir 🔄'];
+
+// Composant Carte X-Ray pour afficher automatiquement les infos directement sur les cartes
+function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void }) {
+  const [cast, setCast] = useState<any[]>([]);
+  const title = item.title || item.name;
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCast = async () => {
+      try {
+        const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
+        const res = await fetch(`https://api.themoviedb.org/3/${mediaType}/${item.id}/credits?api_key=${API_KEY}&language=fr-FR`);
+        const data = await res.json();
+        if (isMounted && data.cast) {
+          setCast(data.cast.slice(0, 2)); // Affiche les 2 acteurs principaux directement
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchCast();
+    return () => { isMounted = false; };
+  }, [item.id, mediaType]);
+
+  return (
+    <div 
+      style={{ 
+        backgroundColor: 'rgba(24, 24, 27, 0.9)', 
+        border: '1px solid rgba(255, 255, 255, 0.12)', 
+        borderRadius: '20px', 
+        overflow: 'hidden', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justify: 'space-between',
+        boxShadow: '0 8px 20px rgba(0,0,0,0.5)'
+      }}
+    >
+      <div onClick={() => onOpen(item)} style={{ cursor: 'pointer' }}>
+        <div style={{ position: 'relative' }}>
+          <img 
+            src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450'} 
+            alt={title} 
+            style={{ width: '100%', height: '200px', objectFit: 'cover' }} 
+          />
+          <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.75)', color: '#FBBF24', fontSize: '10px', fontWeight: '800', padding: '3px 8px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
+            ★ {item.vote_average?.toFixed(1)}
+          </span>
+        </div>
+
+        <div style={{ padding: '12px' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: '800', margin: '0 0 8px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>
+            {title}
+          </h3>
+
+          {/* SECTION X-RAY AUTOMATIQUE SUR LA CARTE ⚡ */}
+          <div style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)', borderRadius: '12px', padding: '8px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '9px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              ⚡ X-Ray Casting :
+            </span>
+            {cast.length > 0 ? (
+              cast.map((actor, idx) => (
+                <div key={idx} style={{ fontSize: '10px', color: '#D4D4D8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '2px' }}>
+                  <strong style={{ color: '#FFF' }}>{actor.name}</strong> <span style={{ color: '#A1A1AA' }}>({actor.character || 'Rôle'})</span>
+                </div>
+              ))
+            ) : (
+              <span style={{ fontSize: '10px', color: '#71717A' }}>Chargement X-Ray...</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* BOUTON BO SPOTIFY DIRECT SUR LA CARTE */}
+      <div style={{ padding: '0 12px 12px 12px' }}>
+        <a
+          href={`https://open.spotify.com/search/${encodeURIComponent(title + ' soundtrack')}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            gap: '4px', 
+            backgroundColor: '#1DB954', 
+            color: '#000', 
+            textDecoration: 'none', 
+            fontSize: '10px', 
+            fontWeight: '800', 
+            padding: '6px 8px', 
+            borderRadius: '10px',
+            width: '100%',
+            boxSizing: 'border-box'
+          }}
+        >
+          🎵 B.O. Spotify →
+        </a>
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   const [mediaType, setMediaType] = useState<'movie' | 'tv'>('movie'); 
@@ -51,7 +150,6 @@ export default function HomePage() {
 
   const [activeTab, setActiveTab] = useState<'info' | 'xray'>('info');
 
-  // Détails étendus & X-Ray
   const [mediaDetailsExt, setMediaDetailsExt] = useState<{ 
     director: string; 
     castWithRoles: { name: string; character: string; profile_path: string | null }[]; 
@@ -71,7 +169,6 @@ export default function HomePage() {
   });
   const [loadingExt, setLoadingExt] = useState(false);
 
-  // Carnet de bord
   const [userNotes, setUserNotes] = useState('');
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -353,7 +450,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* NAVIGATION SECONDAIRE ET BOUTON RETOUR ACCUEIL */}
+        {/* NAVIGATION SECONDAIRE */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           {isSetupComplete ? (
             <button
@@ -575,30 +672,20 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* TENDANCES */}
+            {/* TENDANCES AVEC CARTES X-RAY AUTOMATIQUES ⚡ */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
-                🔥 Tendances {mediaType === 'movie' ? 'Films' : 'Séries'} du moment ({trendingMedia.length})
+                🔥 Tendances {mediaType === 'movie' ? 'Films' : 'Séries'} ({trendingMedia.length})
               </h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {trendingMedia.map((item) => (
-                  <div 
-                    key={item.id} 
-                    onClick={() => openMediaModal(item)}
-                    style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
-                  >
-                    <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt="" style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
-                    <div style={{ padding: '10px' }}>
-                      <h3 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title || item.name}</h3>
-                      <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {item.vote_average?.toFixed(1)}</span>
-                    </div>
-                  </div>
+                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} />
                 ))}
               </div>
             </div>
           </div>
         ) : (
-          /* RECOMMANDATIONS SUR-MESURE AVEC BOUTON RETOUR */
+          /* RECOMMANDATIONS SUR-MESURE AVEC CARTES X-RAY AUTOMATIQUES ⚡ */
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#C084FC' }}>
@@ -620,28 +707,21 @@ export default function HomePage() {
                 ✏️ Réinitialiser / Modifier
               </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
               {recommendedMedia.map((item) => (
-                <div key={item.id} onClick={() => openMediaModal(item)} style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
-                  <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt="" style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
-                  <div style={{ padding: '10px' }}>
-                    <h3 style={{ fontSize: '11px', fontWeight: '700', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title || item.name}</h3>
-                    <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {item.vote_average?.toFixed(1)}</span>
-                  </div>
-                </div>
+                <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} />
               ))}
             </div>
           </div>
         )}
 
-        {/* MODALE FICHE FILM / SÉRIE AVEC X-RAY ⚡ ET PARTAGE 📤 */}
+        {/* MODALE FICHE FILM / SÉRIE */}
         {selectedMediaDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
               
               <button onClick={() => setSelectedMediaDetail(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700', zIndex: 10 }}>✕</button>
 
-              {/* ONGLETS : INFOS VS X-RAY */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '10px' }}>
                 <button
                   onClick={() => setActiveTab('info')}
@@ -678,7 +758,6 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* ONGLET 1 : INFOS HABITUELLES */}
               {activeTab === 'info' && (
                 <div>
                   <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
@@ -703,7 +782,6 @@ export default function HomePage() {
                     {selectedMediaDetail.overview}
                   </p>
 
-                  {/* STREAMING */}
                   <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
                       📺 Où le regarder :
@@ -752,7 +830,6 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  {/* TRAILER */}
                   <div style={{ marginBottom: '20px' }}>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>🎬 Bande-annonce :</span>
                     {mediaDetailsExt.trailerKey ? (
@@ -766,7 +843,6 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* ONGLET 2 : PANNEAU X-RAY ⚡ */}
               {activeTab === 'xray' && (
                 <div>
                   <div style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '16px', padding: '12px', marginBottom: '16px' }}>
@@ -808,7 +884,6 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* CARNET DE BORD & ACTIONS */}
               <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', margin: 0 }}>📓 Mon Carnet de Bord</h3>
