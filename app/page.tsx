@@ -23,10 +23,10 @@ export default function HomePage() {
   const [nowPlayingMovies, setNowPlayingMovies] = useState<any[]>([]);
   const [recommendedMovies, setRecommendedMovies] = useState<any[]>([]);
   const [rouletteMovie, setRouletteMovie] = useState<any>(null);
-  const [isSpinning, setIsSpinning] = useState(false); // Animation Whaou
+  const [isSpinning, setIsSpinning] = useState(false);
   const [selectedMovieDetail, setSelectedMovieDetail] = useState<any>(null);
 
-  // Crédits, Plateformes & Bande-annonce (Trailer)
+  // Crédits, Plateformes & Bande-annonce
   const [movieDetailsExt, setMovieDetailsExt] = useState<{ director: string; cast: string[]; providers: any[]; trailerKey: string | null }>({
     director: '',
     cast: [],
@@ -35,7 +35,7 @@ export default function HomePage() {
   });
   const [loadingExt, setLoadingExt] = useState(false);
 
-  // Champs du Notebook / Carnet de bord
+  // Carnet de bord
   const [userNotes, setUserNotes] = useState('');
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -72,7 +72,6 @@ export default function HomePage() {
     }
   };
 
-  // Lancer la roulette Whaou 🎰
   const fetchRandomMovie = async () => {
     setIsSpinning(true);
     setRouletteMovie(null);
@@ -90,7 +89,7 @@ export default function HomePage() {
           setRouletteMovie(random);
         }
         setIsSpinning(false);
-      }, 800); // Petit délai pour le suspense !
+      }, 800);
     } catch (err) {
       console.error(err);
       setIsSpinning(false);
@@ -188,39 +187,14 @@ export default function HomePage() {
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
-        {/* HEADER AVEC BOUTON ACCUEIL & BULLE PROFIL */}
+        {/* HEADER AVEC BULLE PROFIL */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* BOUTON RETOUR / ACCUEIL */}
-            {isSetupComplete && (
-              <button
-                onClick={() => setIsSetupComplete(false)}
-                title="Retour à l'accueil"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#FFF',
-                  borderRadius: '12px',
-                  padding: '8px 12px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                🏠 Accueil
-              </button>
-            )}
-            <div>
-              <h1 style={{ fontSize: '26px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
-                CineMatch 🎬
-              </h1>
-            </div>
+          <div>
+            <h1 style={{ fontSize: '26px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+              CineMatch 🎬
+            </h1>
           </div>
 
-          {/* BULLE PROFIL */}
           <a 
             href="/profile" 
             title="Mon Profil & Espace Membre"
@@ -243,8 +217,26 @@ export default function HomePage() {
           </a>
         </header>
 
-        {/* NAVIGATION SECONDAIRE */}
+        {/* NAVIGATION : ACCUEIL PUIS WATCHLIST */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+          {isSetupComplete && (
+            <button
+              onClick={() => setIsSetupComplete(false)}
+              style={{
+                color: '#FFF',
+                fontSize: '12px',
+                fontWeight: '600',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                cursor: 'pointer'
+              }}
+            >
+              🏠 Accueil
+            </button>
+          )}
+
           <a href="/watchlist" style={{ color: '#C084FC', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(192, 132, 252, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(192, 132, 252, 0.2)' }}>
             📌 Ma Watchlist
           </a>
@@ -259,7 +251,7 @@ export default function HomePage() {
         {/* CONTENU PRINCIPAL */}
         {!isSetupComplete ? (
           <div>
-            {/* 1. PANNEAU SELECTION DES GENRES */}
+            {/* 1. SELECTION DES GENRES */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '24px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Quels sont tes genres préférés ? 🍿</h2>
               <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Sélectionne tes catégories favorites.</p>
@@ -313,7 +305,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* 2. ROULETTE EXPRESS "WHAOU" (PLACÉE ICI ENTRE LES DEUX SECTIONS) */}
+            {/* 2. ROULETTE EXPRESS SURPRISE */}
             <div style={{ 
               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(236, 72, 153, 0.15))', 
               border: '1px solid rgba(192, 132, 252, 0.4)', 
@@ -342,14 +334,12 @@ export default function HomePage() {
                   padding: '12px 24px',
                   borderRadius: '16px',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(251, 191, 36, 0.4)',
-                  transition: 'transform 0.1s'
+                  boxShadow: '0 4px 15px rgba(251, 191, 36, 0.4)'
                 }}
               >
                 {isSpinning ? '🎰 Tirage en cours...' : '💥 Lancer la Roulette !'}
               </button>
 
-              {/* RÉSULTAT DE LA ROULETTE (OUVRE LA FICHE COMPLÈTE AU CLIC) */}
               {rouletteMovie && !isSpinning && (
                 <div 
                   onClick={() => openMovieModal(rouletteMovie)}
@@ -375,7 +365,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* 3. SECTION FILMS À L'AFFICHE */}
+            {/* 3. FILMS À L'AFFICHE */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
                 🔥 À l'affiche au cinéma ({nowPlayingMovies.length})
@@ -398,7 +388,7 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          /* VUE RECOMMANDATIONS SUR-MESURE SUR LA PAGE D'ACCUEIL */
+          /* RECOMMANDATIONS SUR-MESURE */
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px', color: '#C084FC' }}>
               🎯 Recommandés selon tes choix ({recommendedMovies.length})
@@ -417,14 +407,13 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MODALE FICHE FILM UNIFIÉE (MEME STRUCTURE POUR TOUS LES FILMS) */}
+        {/* MODALE FICHE FILM UNIFIÉE */}
         {selectedMovieDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
               
               <button onClick={() => setSelectedMovieDetail(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700', zIndex: 10 }}>✕</button>
 
-              {/* Poster + Infos */}
               <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                 <img src={`https://image.tmdb.org/t/p/w500${selectedMovieDetail.poster_path}`} alt={selectedMovieDetail.title} style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
                 <div style={{ flex: 1 }}>
@@ -443,12 +432,11 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Synopsis */}
               <p style={{ fontSize: '12px', color: '#D4D4D8', lineHeight: '1.5', margin: '0 0 16px 0' }}>
                 {selectedMovieDetail.overview}
               </p>
 
-              {/* DISPONIBILITÉ (STREAMING OU SÉANCES CINÉMA EN DIRECT) */}
+              {/* STREAMING OU CINÉMA */}
               <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
                   📺 Où le regarder :
@@ -492,7 +480,7 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* BANDE-ANNONCE (TRAILER YOUTUBE) */}
+              {/* TRAILER YOUTUBE */}
               <div style={{ marginBottom: '20px' }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
                   🎬 Bande-annonce officielle :
@@ -524,7 +512,6 @@ export default function HomePage() {
                   📓 Mon Carnet de Bord
                 </h3>
 
-                {/* 1. Ma Note sur 5 ⭐ */}
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Ma Note Personnelle :</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -540,7 +527,6 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* 2. Tags de visionnage */}
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Contexte & Ambiance :</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -567,7 +553,6 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* 3. Bloc Notes Libre */}
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Mes remarques & répliques marquantes :</label>
                   <textarea
@@ -590,7 +575,6 @@ export default function HomePage() {
                   />
                 </div>
 
-                {/* Actions Propres */}
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button 
                     onClick={() => saveToSupabaseWithNotebook('watched')}
