@@ -11,16 +11,15 @@ export default function HomePage() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // Met ici ta VRAIE clé API TMDB v3 (sans espaces)
-      const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY || '52a5ec6696ef2c6e6df66914edbfb732'; 
+      // Clé API TMDB directe
+      const API_KEY = '52a5ec6696ef2c6e6df66914edbfb732'; 
       
-      // On teste d'abord l'URL standard avec paramètre api_key
       const response = await fetch(
         `https://api.themoviedb.org/3/movie/popular?api_key=${API_KEY}&language=fr-FR&page=1`
       );
       
       if (!response.ok) {
-        throw new Error(`Clé API non reconnue par TMDB (Code ${response.status})`);
+        throw new Error(`Erreur TMDB (Code ${response.status})`);
       }
 
       const data = await response.json();
@@ -37,7 +36,7 @@ export default function HomePage() {
           overview: randomData.overview || "Aucun synopsis disponible en français pour ce film.",
         });
       } else {
-        throw new Error("Aucun résultat trouvé sur TMDB.");
+        throw new Error("Aucun film trouvé.");
       }
     } catch (error: any) {
       console.error("Erreur avec l'API TMDB :", error);
@@ -70,8 +69,7 @@ export default function HomePage() {
           </div>
         ) : errorMsg ? (
           <div style={{ textAlign: 'center', padding: '30px 0' }}>
-            <p style={{ color: '#EF4444', fontSize: '13px', marginBottom: '16px', lineHeight: '1.4' }}>⚠️ {errorMsg}</p>
-            <p style={{ color: '#A1A1AA', fontSize: '11px', marginBottom: '16px' }}>Vérifie la clé API dans les paramètres Vercel ou dans le fichier.</p>
+            <p style={{ color: '#EF4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {errorMsg}</p>
             <button 
               onClick={() => fetchRandomMovie()}
               style={{ backgroundColor: '#9333EA', color: '#FFFFFF', border: 'none', fontSize: '12px', fontWeight: '700', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer' }}
