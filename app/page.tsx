@@ -339,11 +339,28 @@ export default function HomePage() {
     if (!selectedMediaDetail) return;
     setFeedback(null);
     const title = selectedMediaDetail.title || selectedMediaDetail.name;
+    const movieIdStr = selectedMediaDetail.id.toString();
 
     try {
+      // 1. Vérifier si le film/série existe déjà dans la base
+      const { data: existing, error: checkError } = await supabase
+        .from('watchlist')
+        .select('id')
+        .eq('movie_id', movieIdStr);
+
+      if (checkError) throw checkError;
+
+      if (existing && existing.length > 0) {
+        setFeedback('⚠️ Ce média est déjà dans votre liste !');
+        setTimeout(() => setFeedback(null), 3000);
+        setSelectedMediaDetail(null);
+        return;
+      }
+
+      // 2. Sinon, on procède à l'insertion
       const { error } = await supabase.from('watchlist').insert([
         {
-          movie_id: selectedMediaDetail.id.toString(),
+          movie_id: movieIdStr,
           title: title,
           poster_path: selectedMediaDetail.poster_path ? `https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}` : selectedMediaDetail.poster,
           vote_average: parseFloat(selectedMediaDetail.vote_average || 0),
@@ -395,7 +412,7 @@ export default function HomePage() {
   }, [mediaType, isMounted]);
 
   if (!isMounted) {
-    return null; // Évite les erreurs d'hydratation SSR
+    return null;
   }
 
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
