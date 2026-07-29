@@ -230,7 +230,7 @@ export default function HomePage() {
     }
   };
 
-  // RECHERCHE PAR ASSISTANT IA (AVEC TMDB FALLBACK & MATCHING)
+  // RECHERCHE PAR ASSISTANT IA (VRAIE RECHERCHE SÉMANTIQUE GEMINI)
   const handleAiSearch = async () => {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
@@ -238,29 +238,49 @@ export default function HomePage() {
 
     try {
       const API_KEY_TMDB = '93388a6035cae903edcb4051e1eb6e7b';
-      
-      // 1. Simulation d'une recherche sémantique intelligente basée sur le prompt
-      // En production, tu peux brancher ton API OpenAI/Gemini ici.
-      const searchTerms = aiPrompt.split(' ').filter(w => w.length > 3);
-      const queryTerm = searchTerms[0] || aiPrompt;
 
-      const res = await fetch(`https://api.themoviedb.org/3/search/${mediaType}?api_key=${API_KEY_TMDB}&language=fr-FR&query=${encodeURIComponent(queryTerm)}&page=1`);
-      const data = await res.json();
+      // 1. Demande à notre route API Gemini d'analyser le concept
+      const aiRes = await fetch('/api/ai-recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt, mediaType }),
+      });
 
-      if (data.results && data.results.length > 0) {
-        // Ajouter un commentaire explicatif généré par l'assistant
-        const enrichedResults = data.results.slice(0, 4).map((item: any) => ({
-          ...item,
-          aiReason: `Pépite sélectionnée pour toi selon ton envie : "${aiPrompt}"`
-        }));
-        setAiResults(enrichedResults);
+      const aiData = await aiRes.json();
+
+      if (!aiData.recommendations || aiData.recommendations.length === 0) {
+        setFeedback('🤖 L\'assistant n\'a pas trouvé de réponse. Réessaie !');
+        setTimeout(() => setFeedback(null), 3000);
+        setAiLoading(false);
+        return;
+      }
+
+      // 2. Récupération des visuels TMDB pour chaque film suggéré par l'IA
+      const fetchedResults: any[] = [];
+
+      for (const rec of aiData.recommendations) {
+        const tmdbRes = await fetch(
+          `https://api.themoviedb.org/3/search/${mediaType}?api_key=${API_KEY_TMDB}&language=fr-FR&query=${encodeURIComponent(rec.title)}&page=1`
+        );
+        const tmdbData = await tmdbRes.json();
+
+        if (tmdbData.results && tmdbData.results.length > 0) {
+          fetchedResults.push({
+            ...tmdbData.results[0],
+            aiReason: rec.reason,
+          });
+        }
+      }
+
+      if (fetchedResults.length > 0) {
+        setAiResults(fetchedResults);
       } else {
-        setFeedback('🤖 L\'assistant n\'a pas trouvé de correspondance directe. Essaie d\'autres mots !');
+        setFeedback('🤖 Impossible de charger les fiches des films suggérés.');
         setTimeout(() => setFeedback(null), 3000);
       }
     } catch (err) {
       console.error(err);
-      setFeedback('⚠️ Erreur avec l\'assistant IA');
+      setFeedback('⚠️ Erreur lors de la recherche IA');
       setTimeout(() => setFeedback(null), 3000);
     }
     setAiLoading(false);
@@ -607,7 +627,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ASSISTANT IA (PROMPT INTELLIGENT AVEC DESCRIPTION LIBRE) */}
+        {/* ASSISTANT IA (PROMPT INTELLIGENT) */}
         {!isSetupComplete && (
           <div style={{ 
             background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.25), rgba(59, 130, 246, 0.2))', 
@@ -625,7 +645,7 @@ export default function HomePage() {
             </div>
             
             <p style={{ fontSize: '11px', color: '#D4D4D8', margin: '0 0 12px 0' }}>
-              Décris ton envie en langage naturel (ex: <i>"Un film de SF spatiale dynamique sans huis clos"</i>).
+              Décris ton envie en langage naturel (ex: <i>"Un film de voyage dans le temps qui fait réfléchir"</i>).
             </p>
 
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -633,7 +653,7 @@ export default function HomePage() {
                 type="text"
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Ex: Un thriller psychologique sombre et prenant..."
+                placeholder="Ex: voyage dans le temps..."
                 onKeyDown={(e) => e.key === 'Enter' && handleAiSearch()}
                 style={{
                   flex: 1,
@@ -661,13 +681,13 @@ export default function HomePage() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                {aiLoading ? '🤖 Analyse...' : '✨ Proposer'}
+                {aiLoading ? '🤖 Recherche IA...' : '✨ Demander'}
               </button>
             </div>
 
             {/* RÉSULTATS DE L'ASSISTANT IA */}
             {aiResults.length > 0 && (
-              <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px' }}>
+              <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '12px' }}>
                 {aiResults.map((item) => (
                   <div
                     key={item.id}
@@ -680,10 +700,13 @@ export default function HomePage() {
                       cursor: 'pointer'
                     }}
                   >
-                    <img src={item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : 'https://via.placeholder.com/130x180'} alt="" style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                    <img src={item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : 'https://via.placeholder.com/130x180'} alt="" style={{ width: '100%', height: '130px', objectFit: 'cover' }} />
                     <div style={{ padding: '8px' }}>
                       <h4 style={{ fontSize: '11px', fontWeight: '800', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>{item.title || item.name}</h4>
                       <span style={{ fontSize: '9px', color: '#C084FC', fontWeight: '700', display: 'block' }}>★ {item.vote_average?.toFixed(1)} / 10</span>
+                      {item.aiReason && (
+                        <p style={{ fontSize: '9px', color: '#A1A1AA', margin: '4px 0 0 0', lineHeight: '1.2' }}>{item.aiReason}</p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -818,7 +841,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* ROULETTE EXPRESS AVEC BOUTONS CÔTE À CÔTE À DROITE */}
+            {/* ROULETTE EXPRESS */}
             <div style={{ 
               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(236, 72, 153, 0.15))', 
               border: '1px solid rgba(192, 132, 252, 0.4)', 
@@ -1088,7 +1111,6 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  {/* BOUTON SPOTIFY EXCLUSIF X-RAY */}
                   <div style={{ marginBottom: '16px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '12px', borderRadius: '12px' }}>
                     <h4 style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '700', margin: '0 0 6px 0' }}>🎵 Bande Originale & Musique</h4>
                     <a
