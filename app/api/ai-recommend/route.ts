@@ -24,9 +24,9 @@ export async function POST(req: Request) {
     2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
     [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
 
-    // 1er essai : gemini-2.0-flash
-    let geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    // Modèle gratuit standard gemini-1.5-flash sur l'API v1beta
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36,25 +36,11 @@ export async function POST(req: Request) {
       }
     );
 
-    // Secours si jamais gemini-2.0-flash renvoie un souci : bascule sur gemini-1.5-flash
-    if (!geminiRes.ok) {
-      geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: systemPrompt }] }]
-          })
-        }
-      );
-    }
-
     const geminiData = await geminiRes.json();
 
     if (!geminiRes.ok) {
       return NextResponse.json({ 
-        error: `Erreur Google AI (${geminiRes.status}): ${geminiData.error?.message || 'Problème de génération'}` 
+        error: `Erreur Google AI (${geminiRes.status}): ${geminiData.error?.message || 'Quota temporairement atteint, réessaye dans quelques secondes !'}` 
       }, { status: geminiRes.status });
     }
 
