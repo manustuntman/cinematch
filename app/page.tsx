@@ -33,7 +33,6 @@ const AVERSIONS_LIST = [
 
 const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩‍👦', 'Coup de cœur ❤️', 'À revoir 🔄'];
 
-// Composant Carte X-Ray pour afficher automatiquement les infos directement sur les cartes
 function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void }) {
   const [cast, setCast] = useState<any[]>([]);
   const title = item.title || item.name;
@@ -46,7 +45,7 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
         const res = await fetch(`https://api.themoviedb.org/3/${mediaType}/${item.id}/credits?api_key=${API_KEY}&language=fr-FR`);
         const data = await res.json();
         if (isMounted && data.cast) {
-          setCast(data.cast.slice(0, 2)); // Affiche les 2 acteurs principaux directement
+          setCast(data.cast.slice(0, 2));
         }
       } catch (err) {
         console.error(err);
@@ -65,7 +64,7 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
         overflow: 'hidden', 
         display: 'flex', 
         flexDirection: 'column', 
-        justify: 'space-between',
+        justifyContent: 'space-between',
         boxShadow: '0 8px 20px rgba(0,0,0,0.5)'
       }}
     >
@@ -86,7 +85,6 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
             {title}
           </h3>
 
-          {/* SECTION X-RAY AUTOMATIQUE SUR LA CARTE ⚡ */}
           <div style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)', borderRadius: '12px', padding: '8px', marginBottom: '8px' }}>
             <span style={{ fontSize: '9px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
               ⚡ X-Ray Casting :
@@ -104,7 +102,6 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
         </div>
       </div>
 
-      {/* BOUTON BO SPOTIFY DIRECT SUR LA CARTE */}
       <div style={{ padding: '0 12px 12px 12px' }}>
         <a
           href={`https://open.spotify.com/search/${encodeURIComponent(title + ' soundtrack')}`}
@@ -450,7 +447,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* NAVIGATION SECONDAIRE */}
+        {/* NAVIGATION SECONDAIRE AVEC BOUTON RETOUR ET PLAYLISTS */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           {isSetupComplete ? (
             <button
@@ -472,9 +469,14 @@ export default function HomePage() {
             <div></div>
           )}
 
-          <a href="/watchlist" style={{ color: '#C084FC', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(192, 132, 252, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(192, 132, 252, 0.2)' }}>
-            📌 Ma Watchlist
-          </a>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <a href="/playlists" style={{ color: '#FBBF24', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(251, 191, 36, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
+              🎵 Playlists
+            </a>
+            <a href="/watchlist" style={{ color: '#C084FC', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(192, 132, 252, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(192, 132, 252, 0.2)' }}>
+              📌 Watchlist
+            </a>
+          </div>
         </div>
 
         {feedback && (
@@ -488,7 +490,7 @@ export default function HomePage() {
           <div>
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '24px' }}>
               
-              {/* 1. CHOIX DU FORMAT (FILM VS SÉRIE) */}
+              {/* 1. CHOIX DU FORMAT */}
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 1 sur 3</span>
               <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>Que veux-tu regarder aujourd'hui ? 🍿</h2>
               
@@ -558,7 +560,7 @@ export default function HomePage() {
                 })}
               </div>
 
-              {/* 3. FILTRES D'AVERSIONS & PHOBIES 🚫 */}
+              {/* 3. FILTRES D'AVERSIONS & PHOBIES */}
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#EF4444', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 3 sur 3 (Optionnel)</span>
               <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: '#F87171' }}>Écarter ce que tu N'AIMES PAS :</h3>
               <p style={{ fontSize: '11px', color: '#A1A1AA', marginBottom: '12px' }}>Sélectionne tes phobies ou éléments à exclure.</p>
@@ -672,7 +674,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* TENDANCES AVEC CARTES X-RAY AUTOMATIQUES ⚡ */}
+            {/* TENDANCES AVEC CARTES X-RAY */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
                 🔥 Tendances {mediaType === 'movie' ? 'Films' : 'Séries'} ({trendingMedia.length})
@@ -685,7 +687,7 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          /* RECOMMANDATIONS SUR-MESURE AVEC CARTES X-RAY AUTOMATIQUES ⚡ */
+          /* RECOMMANDATIONS SUR-MESURE */
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#C084FC' }}>
@@ -715,7 +717,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MODALE FICHE FILM / SÉRIE */}
+        {/* MODALE FICHE MEDIA */}
         {selectedMediaDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
