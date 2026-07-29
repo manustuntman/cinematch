@@ -108,6 +108,7 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
 }
 
 export default function HomePage() {
+  const [isMounted, setIsMounted] = useState(false);
   const [mediaType, setMediaType] = useState<'movie' | 'tv'>('movie'); 
   const [preferences, setPreferences] = useState<number[]>([]);
   const [selectedAversions, setSelectedAversions] = useState<number[]>([]);
@@ -149,6 +150,10 @@ export default function HomePage() {
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const fetchUserPlaylists = async () => {
     try {
@@ -384,8 +389,14 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    fetchTrending();
-  }, [mediaType]);
+    if (isMounted) {
+      fetchTrending();
+    }
+  }, [mediaType, isMounted]);
+
+  if (!isMounted) {
+    return null; // Évite les erreurs d'hydratation SSR
+  }
 
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
 
@@ -671,7 +682,6 @@ export default function HomePage() {
                     </span>
                   </div>
 
-                  {/* BOUTONS D'ACTION PLACÉS DIRECTEMENT À DROITE */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
                     <button 
                       onClick={() => {
