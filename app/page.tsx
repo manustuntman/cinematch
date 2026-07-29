@@ -353,8 +353,28 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* NAVIGATION SECONDAIRE */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+        {/* NAVIGATION SECONDAIRE ET BOUTON RETOUR ACCUEIL */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          {isSetupComplete ? (
+            <button
+              onClick={() => setIsSetupComplete(false)}
+              style={{
+                color: '#FFF',
+                fontSize: '12px',
+                fontWeight: '600',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                cursor: 'pointer'
+              }}
+            >
+              ← 🏠 Modifier les filtres
+            </button>
+          ) : (
+            <div></div>
+          )}
+
           <a href="/watchlist" style={{ color: '#C084FC', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(192, 132, 252, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(192, 132, 252, 0.2)' }}>
             📌 Ma Watchlist
           </a>
@@ -578,14 +598,26 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          /* RECOMMANDATIONS SUR-MESURE */
+          /* RECOMMANDATIONS SUR-MESURE AVEC BOUTON RETOUR */
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#C084FC' }}>
                 🎯 Sélection pour toi
               </h2>
-              <button onClick={() => setIsSetupComplete(false)} style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: '#FFF', border: 'none', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', cursor: 'pointer' }}>
-                ✏️ Modifier mes filtres
+              <button 
+                onClick={() => setIsSetupComplete(false)} 
+                style={{ 
+                  backgroundColor: 'rgba(255,255,255,0.08)', 
+                  color: '#FFF', 
+                  border: '1px solid rgba(255, 255, 255, 0.15)', 
+                  padding: '6px 12px', 
+                  borderRadius: '12px', 
+                  fontSize: '11px', 
+                  fontWeight: '600',
+                  cursor: 'pointer' 
+                }}
+              >
+                ✏️ Réinitialiser / Modifier
               </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
