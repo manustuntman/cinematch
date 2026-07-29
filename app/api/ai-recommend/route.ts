@@ -18,12 +18,13 @@ export async function POST(req: Request) {
     const systemPrompt = `Tu es un expert cinéma et recommandeur ultra-pointu.
     Propose exactement 5 ${typeLabel} qui correspondent au CONCEPT et à l'AMBIANCE de cette demande : "${prompt}".
     Règles :
-    1. Ne cherche pas juste les mots dans le titre, trouve de véritables œuvres qui traitent du thème (ex: voyage dans le temps = Predestination, Looper, L'Effet Papillon, Interstellar, etc.).
+    1. Ne cherche pas juste les mots dans le titre, trouve de véritables œuvres qui traitent du thème.
     2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
     [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
 
+    // Utilisation de la version stable v1 avec le modèle 1.5-flash
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
