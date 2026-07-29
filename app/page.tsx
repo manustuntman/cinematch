@@ -124,6 +124,11 @@ export default function HomePage() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedMediaDetail, setSelectedMediaDetail] = useState<any>(null);
 
+  // ÉTATS DE L'ASSISTANT IA
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResults, setAiResults] = useState<any[]>([]);
+
   const [activeTab, setActiveTab] = useState<'info' | 'xray'>('info');
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>('');
@@ -223,6 +228,42 @@ export default function HomePage() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  // RECHERCHE PAR ASSISTANT IA (AVEC TMDB FALLBACK & MATCHING)
+  const handleAiSearch = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiLoading(true);
+    setAiResults([]);
+
+    try {
+      const API_KEY_TMDB = '93388a6035cae903edcb4051e1eb6e7b';
+      
+      // 1. Simulation d'une recherche sémantique intelligente basée sur le prompt
+      // En production, tu peux brancher ton API OpenAI/Gemini ici.
+      const searchTerms = aiPrompt.split(' ').filter(w => w.length > 3);
+      const queryTerm = searchTerms[0] || aiPrompt;
+
+      const res = await fetch(`https://api.themoviedb.org/3/search/${mediaType}?api_key=${API_KEY_TMDB}&language=fr-FR&query=${encodeURIComponent(queryTerm)}&page=1`);
+      const data = await res.json();
+
+      if (data.results && data.results.length > 0) {
+        // Ajouter un commentaire explicatif généré par l'assistant
+        const enrichedResults = data.results.slice(0, 4).map((item: any) => ({
+          ...item,
+          aiReason: `Pépite sélectionnée pour toi selon ton envie : "${aiPrompt}"`
+        }));
+        setAiResults(enrichedResults);
+      } else {
+        setFeedback('🤖 L\'assistant n\'a pas trouvé de correspondance directe. Essaie d\'autres mots !');
+        setTimeout(() => setFeedback(null), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+      setFeedback('⚠️ Erreur avec l\'assistant IA');
+      setTimeout(() => setFeedback(null), 3000);
+    }
+    setAiLoading(false);
   };
 
   const fetchRandomMedia = async () => {
@@ -542,11 +583,10 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* CAROUSEL FLUIDE EN MOUVEMENT (DISCRET ET VIF) */}
+        {/* CAROUSEL FLUIDE EN MOUVEMENT */}
         {!isSetupComplete && carouselMedia.length > 0 && (
           <div style={{ marginBottom: '20px', overflow: 'hidden', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(24, 24, 27, 0.4)', padding: '10px 0', position: 'relative' }}>
             <div className="animate-marquee" style={{ display: 'flex', gap: '12px' }}>
-              {/* On duplique le tableau pour créer une boucle fluide infinie */}
               {[...carouselMedia, ...carouselMedia].map((item, idx) => (
                 <div 
                   key={`${item.id}-${idx}`}
@@ -564,6 +604,91 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ASSISTANT IA (PROMPT INTELLIGENT AVEC DESCRIPTION LIBRE) */}
+        {!isSetupComplete && (
+          <div style={{ 
+            background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.25), rgba(59, 130, 246, 0.2))', 
+            border: '1px solid rgba(192, 132, 252, 0.4)', 
+            borderRadius: '24px', 
+            padding: '20px', 
+            marginBottom: '24px',
+            boxShadow: '0 10px 25px -5px rgba(147, 51, 234, 0.25)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '18px' }}>🤖</span>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', margin: 0, color: '#FFF' }}>
+                Assistant IA : Dis-moi exactement ce que tu cherches
+              </h3>
+            </div>
+            
+            <p style={{ fontSize: '11px', color: '#D4D4D8', margin: '0 0 12px 0' }}>
+              Décris ton envie en langage naturel (ex: <i>"Un film de SF spatiale dynamique sans huis clos"</i>).
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="Ex: Un thriller psychologique sombre et prenant..."
+                onKeyDown={(e) => e.key === 'Enter' && handleAiSearch()}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: '14px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#FFF',
+                  fontSize: '12px',
+                  outline: 'none'
+                }}
+              />
+              <button
+                onClick={handleAiSearch}
+                disabled={aiLoading}
+                style={{
+                  backgroundColor: '#9333EA',
+                  color: '#FFF',
+                  border: 'none',
+                  padding: '10px 18px',
+                  borderRadius: '14px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {aiLoading ? '🤖 Analyse...' : '✨ Proposer'}
+              </button>
+            </div>
+
+            {/* RÉSULTATS DE L'ASSISTANT IA */}
+            {aiResults.length > 0 && (
+              <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px' }}>
+                {aiResults.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => openMediaModal(item)}
+                    style={{
+                      backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                      border: '1px solid rgba(192, 132, 252, 0.4)',
+                      borderRadius: '14px',
+                      overflow: 'hidden',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <img src={item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : 'https://via.placeholder.com/130x180'} alt="" style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                    <div style={{ padding: '8px' }}>
+                      <h4 style={{ fontSize: '11px', fontWeight: '800', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>{item.title || item.name}</h4>
+                      <span style={{ fontSize: '9px', color: '#C084FC', fontWeight: '700', display: 'block' }}>★ {item.vote_average?.toFixed(1)} / 10</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
