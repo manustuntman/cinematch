@@ -37,7 +37,7 @@ const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩�
 export default function HomePage() {
   const [mediaType, setMediaType] = useState<'movie' | 'tv'>('movie'); 
   const [preferences, setPreferences] = useState<number[]>([]);
-  const [selectedAversions, setSelectedAversions] = useState<number[]>([]); // Phobies / Aversions
+  const [selectedAversions, setSelectedAversions] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');                 
@@ -77,7 +77,6 @@ export default function HomePage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // Générer les mots-clés d'aversion sous forme de string séparée par des virgules
   const getExcludedKeywordsString = () => {
     return selectedAversions
       .map(id => AVERSIONS_LIST.find(a => a.id === id)?.keyword)
@@ -85,7 +84,6 @@ export default function HomePage() {
       .join(',');
   };
 
-  // Recherche TMDB
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (query.trim().length < 2) {
@@ -105,7 +103,6 @@ export default function HomePage() {
     }
   };
 
-  // Charger les Tendances
   const fetchTrending = async () => {
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
@@ -120,7 +117,6 @@ export default function HomePage() {
     }
   };
 
-  // Recommandations selon genres & aversions
   const fetchRecommendations = async (selectedGenres: number[]) => {
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
@@ -140,7 +136,6 @@ export default function HomePage() {
     }
   };
 
-  // Roulette Express respectant les phobies et genres choisis
   const fetchRandomMedia = async () => {
     setIsSpinning(true);
     setRouletteMedia(null);
@@ -168,7 +163,6 @@ export default function HomePage() {
     }
   };
 
-  // Détails étendus
   const fetchExtraDetails = async (id: string | number) => {
     setLoadingExt(true);
     try {
