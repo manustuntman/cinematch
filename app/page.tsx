@@ -353,13 +353,13 @@ export default function HomePage() {
                 {selectedMovieDetail.overview}
               </p>
 
-              {/* Plateformes de Streaming */}
+              {/* DISPONIBILITÉ (STREAMING OU SÉANCES CINÉMA EN DIRECT) */}
               <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
-                  📺 Disponible en streaming (FR) :
+                  📺 Où le regarder :
                 </span>
                 {loadingExt ? (
-                  <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Recherche des plateformes...</span>
+                  <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Recherche des disponibilités...</span>
                 ) : movieDetailsExt.providers.length > 0 ? (
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     {movieDetailsExt.providers.map((provider: any) => (
@@ -370,7 +370,30 @@ export default function HomePage() {
                     ))}
                   </div>
                 ) : (
-                  <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Non disponible en abonnement streaming actuellement</span>
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#FBBF24', fontWeight: '700', display: 'block', marginBottom: '8px' }}>
+                      🍿 Actuellement au cinéma !
+                    </span>
+                    <a
+                      href={`https://www.google.com/search?q=seance+cinema+${encodeURIComponent(selectedMovieDetail.title)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        backgroundColor: '#9333EA',
+                        color: '#FFF',
+                        textDecoration: 'none',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        padding: '8px 12px',
+                        borderRadius: '10px'
+                      }}
+                    >
+                      📍 Voir les séances près de chez moi →
+                    </a>
+                  </div>
                 )}
               </div>
 
