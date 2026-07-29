@@ -4,7 +4,7 @@ export async function POST(req: Request) {
   try {
     const { prompt, mediaType } = await req.json();
 
-    // On utilise la clé GROQ que tu viens de configurer sur Vercel
+    // On utilise la clé GROQ configurée sur Vercel
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: 'Clé API GROQ manquante sur Vercel' }, { status: 500 });
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
     const typeLabel = mediaType === 'tv' ? 'séries TV' : 'films';
 
-    // Appel à l'API ultra-rapide de Groq (modèle Llama 3)
+    // Appel à l'API de Groq
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192', 
+        model: 'llama-3.3-70b-versatile', // <-- LE NOUVEAU MODÈLE ACTIF ET PUISSANT
         messages: [
           {
             role: 'system',
