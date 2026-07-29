@@ -20,7 +20,7 @@ export default function HomePage() {
   const [preferences, setPreferences] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
-  const [nowPlayingMovies, setNowPlayingMovies] = useState<any[]>([]);
+  const [trendingMovies, setTrendingMovies] = useState<any[]>([]); // Tendances actuelles (semaine)
   const [recommendedMovies, setRecommendedMovies] = useState<any[]>([]);
   const [rouletteMovie, setRouletteMovie] = useState<any>(null);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -42,14 +42,15 @@ export default function HomePage() {
 
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const fetchNowPlaying = async () => {
+  // Charger les Tendances Actuelles de la semaine (mélange blockbusters récents & tops notes)
+  const fetchTrending = async () => {
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
-      const url = `https://api.themoviedb.org/3/movie/now_playing?api_key=${API_KEY}&language=fr-FR&page=1&region=FR`;
+      const url = `https://api.themoviedb.org/3/trending/movie/week?api_key=${API_KEY}&language=fr-FR`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
-        setNowPlayingMovies(data.results.slice(0, 20));
+        setTrendingMovies(data.results.slice(0, 20));
       }
     } catch (err) {
       console.error(err);
@@ -180,7 +181,7 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    fetchNowPlaying();
+    fetchTrending();
   }, []);
 
   return (
@@ -365,13 +366,13 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* 3. FILMS À L'AFFICHE */}
+            {/* 3. TENDANCES ACTUELLES */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
-                🔥 À l'affiche au cinéma ({nowPlayingMovies.length})
+                🔥 Tendances actuelles ({trendingMovies.length})
               </h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
-                {nowPlayingMovies.map((item) => (
+                {trendingMovies.map((item) => (
                   <div 
                     key={item.id} 
                     onClick={() => openMovieModal(item)}
