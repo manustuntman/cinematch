@@ -101,13 +101,11 @@ export default function HomePage() {
     setLoading(false);
   };
 
-  // Récupérer le Réalisateur, le Casting, les Plateformes ET la Bande-annonce (Trailer YouTube)
   const fetchMovieExtraDetails = async (movieId: string | number) => {
     setLoadingExt(true);
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       
-      // 1. Crédits (Réalisateur & Acteurs)
       const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${API_KEY}&language=fr-FR`);
       const creditsData = await creditsRes.json();
       
@@ -115,19 +113,16 @@ export default function HomePage() {
       const directorName = directorObj ? directorObj.name : 'Non renseigné';
       const topCast = creditsData.cast ? creditsData.cast.slice(0, 4).map((c: any) => c.name) : [];
 
-      // 2. Plateformes de Streaming (France)
       const providersRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/watch/providers?api_key=${API_KEY}`);
       const providersData = await providersRes.json();
       const flatrate = providersData.results?.FR?.flatrate || [];
 
-      // 3. Videos / Trailer YouTube (Recherche FR puis EN si introuvable)
       let videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=fr-FR`);
       let videoData = await videoRes.json();
       
       let trailer = videoData.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
       
       if (!trailer) {
-        // Fallback en anglais si pas de trailer fr
         videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=en-US`);
         videoData = await videoRes.json();
         trailer = videoData.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
@@ -181,7 +176,7 @@ export default function HomePage() {
       ]);
 
       if (error) throw error;
-      setFeedback(status === 'to_watch' ? '📌 Enregistré dans ta Watchlist !' : '📖 Carnet de bord mis à jour !');
+      setFeedback(status === 'to_watch' ? '📌 Ajouté à la Watchlist !' : '👁️ Marqué comme vu !');
       setSelectedMovieDetail(null);
     } catch (err) {
       setFeedback(`⚠️ Erreur lors de la sauvegarde`);
@@ -202,7 +197,7 @@ export default function HomePage() {
           <h1 style={{ fontSize: '32px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
             CineMatch 🎬
           </h1>
-          <p style={{ fontSize: '13px', color: '#A1A1AA', marginTop: '4px' }}>Ton assistant cinéma & carnet de bord</p>
+          <p style={{ fontSize: '13px', color: '#A1A1AA', marginTop: '4px' }}>Ton assistant cinéma sur-mesure</p>
         </div>
 
         {/* Navigation Rapide */}
@@ -327,7 +322,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MODALE FICHE FILM COMPLÈTE (AVEC BANDE-ANNONCE YOUTUBE 🎬) */}
+        {/* MODALE FICHE FILM COMPLÈTE */}
         {selectedMovieDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
@@ -379,7 +374,7 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* SECTION BANDE-ANNONCE (TRAILER YOUTUBE) 🎬 */}
+              {/* BANDE-ANNONCE (TRAILER YOUTUBE) */}
               <div style={{ marginBottom: '20px' }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
                   🎬 Bande-annonce officielle :
@@ -405,7 +400,7 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* SECTIONS NOTEBOOK 📓 */}
+              {/* CARNET DE BORD */}
               <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   📓 Mon Carnet de Bord
@@ -477,19 +472,19 @@ export default function HomePage() {
                   />
                 </div>
 
-                {/* Actions */}
+                {/* Actions Propres */}
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button 
                     onClick={() => saveToSupabaseWithNotebook('watched')}
                     style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                   >
-                    👁️ Marquer comme Vu (+ Carnet)
+                    👁️ Marquer comme Vu
                   </button>
                   <button 
                     onClick={() => saveToSupabaseWithNotebook('to_watch')}
                     style={{ flex: 1, backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                   >
-                    📌 Watchlist (+ Carnet)
+                    📌 Ajouter Watchlist
                   </button>
                 </div>
               </div>
