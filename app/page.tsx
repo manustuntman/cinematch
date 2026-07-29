@@ -1,26 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function HomePage() {
   const [movie, setMovie] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const fetchRandomMovie = async () => {
     setLoading(true);
-    setErrorMsg(null);
+    setFeedback(null);
     try {
-      // Ta clé API v3 TMDB
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b'; 
       
       const response = await fetch(
         `https://api.themoviedb.org/3/movie/popular?api_key=${API_KEY}&language=fr-FR&page=1`
       );
       
-      if (!response.ok) {
-        throw new Error(`Erreur TMDB (Code ${response.status})`);
-      }
+      if (!response.ok) throw new Error("Erreur réseau TMDB");
 
       const data = await response.json();
 
@@ -29,20 +28,45 @@ export default function HomePage() {
         const randomData = data.results[randomIndex];
 
         setMovie({
+          id: randomData.id.toString(),
           title: randomData.title,
           year: randomData.release_date ? randomData.release_date.substring(0, 4) : 'N/A',
           rating: randomData.vote_average ? randomData.vote_average.toFixed(1) : 'N/A',
           poster: randomData.poster_path ? `https://image.tmdb.org/t/p/w500${randomData.poster_path}` : '',
-          overview: randomData.overview || "Aucun synopsis disponible en français pour ce film.",
+          overview: randomData.overview || "Aucun synopsis disponible en français.",
         });
-      } else {
-        throw new Error("Aucun résultat trouvé sur TMDB.");
       }
-    } catch (error: any) {
-      console.error("Erreur avec l'API TMDB :", error);
-      setErrorMsg(error.message || "Impossible de charger les films.");
+    } catch (error) {
+      console.error("Erreur avec TMDB :", error);
     }
     setLoading(false);
+  };
+
+  const saveToSupabase = async (status: 'to_watch' | 'watched') => {
+    if (!movie) return;
+    setSaving(true);
+    setFeedback(null);
+
+    try {
+      const { error } = await supabase.from('watchlist').insert([
+        {
+          movie_id: movie.id,
+          title: movie.title,
+          poster_path: movie.poster,
+          vote_average: parseFloat(movie.rating),
+          status: status,
+        },
+      ]);
+
+      if (error) throw error;
+
+      setFeedback(status === 'to_watch' ? '📌 Ajouté à la Watchlist !' : '👁️ Marqué comme vu !');
+    } catch (err: any) {
+      console.error("Erreur Supabase :", err);
+      setFeedback('⚠️ Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -63,21 +87,11 @@ export default function HomePage() {
       {/* Carte Apple Glassmorphism */}
       <div style={{ width: '100%', maxWidth: '360px', borderRadius: '24px', backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', padding: '20px', boxSizing: 'border-box', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)' }}>
         
-        {loading ? (
+        {loading || !movie ? (
           <div style={{ textAlign: 'center', padding: '50px 0', color: '#A1A1AA' }}>
             ⏳ Recherche du film parfait...
           </div>
-        ) : errorMsg ? (
-          <div style={{ textAlign: 'center', padding: '30px 0' }}>
-            <p style={{ color: '#EF4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {errorMsg}</p>
-            <button 
-              onClick={() => fetchRandomMovie()}
-              style={{ backgroundColor: '#9333EA', color: '#FFFFFF', border: 'none', fontSize: '12px', fontWeight: '700', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer' }}
-            >
-              🔄 Réessayer
-            </button>
-          </div>
-        ) : movie && (
+        ) : (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: '#FBBF24' }}>
@@ -97,7 +111,7 @@ export default function HomePage() {
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#A1A1AA' }}>Affiche non disponible</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#A1A1AA' }}>Affiche indisponible</div>
               )}
             </div>
 
@@ -111,19 +125,37 @@ export default function HomePage() {
               {movie.overview}
             </p>
 
-            {/* Boutons */}
-            <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+            {/* Message de confirmation */}
+            {feedback && (
+              <div style={{ fontSize: '12px', textAlign: 'center', marginBottom: '12px', padding: '6px', backgroundColor: 'rgba(192, 132, 252, 0.1)', color: '#C084FC', borderRadius: '8px' }}>
+                {feedback}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  disabled={saving}
+                  onClick={() => saveToSupabase('watched')}
+                  style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFFFFF', border: 'none', fontSize: '12px', fontWeight: '600', padding: '10px', borderRadius: '12px', cursor: 'pointer' }}
+                >
+                  👁️ Vu
+                </button>
+                <button 
+                  disabled={saving}
+                  onClick={() => saveToSupabase('to_watch')}
+                  style={{ flex: 1, backgroundColor: '#9333EA', color: '#FFFFFF', border: 'none', fontSize: '12px', fontWeight: '700', padding: '10px', borderRadius: '12px', cursor: 'pointer' }}
+                >
+                  📌 Watchlist
+                </button>
+              </div>
+
               <button 
-                onClick={() => fetchRandomMovie()}
-                style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFFFFF', border: 'none', fontSize: '12px', fontWeight: '600', padding: '10px', borderRadius: '12px', cursor: 'pointer' }}
+                onClick={fetchRandomMovie}
+                style={{ width: '100%', backgroundColor: 'transparent', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#A1A1AA', fontSize: '12px', padding: '8px', borderRadius: '12px', cursor: 'pointer' }}
               >
-                🔄 Relancer
-              </button>
-              <button 
-                onClick={() => alert('Ajouté à la Watchlist !')}
-                style={{ flex: 1, backgroundColor: '#9333EA', color: '#FFFFFF', border: 'none', fontSize: '12px', fontWeight: '700', padding: '10px', borderRadius: '12px', cursor: 'pointer' }}
-              >
-                📌 Watchlist
+                🔄 Relancer un autre film
               </button>
             </div>
           </>
