@@ -23,6 +23,7 @@ export default function HomePage() {
   const [nowPlayingMovies, setNowPlayingMovies] = useState<any[]>([]);
   const [recommendedMovies, setRecommendedMovies] = useState<any[]>([]);
   const [rouletteMovie, setRouletteMovie] = useState<any>(null);
+  const [isSpinning, setIsSpinning] = useState(false); // Animation Whaou
   const [selectedMovieDetail, setSelectedMovieDetail] = useState<any>(null);
 
   // Crédits, Plateformes & Bande-annonce (Trailer)
@@ -39,8 +40,6 @@ export default function HomePage() {
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  const [mode, setMode] = useState<'recommendations' | 'roulette'>('recommendations');
-  const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const fetchNowPlaying = async () => {
@@ -58,7 +57,6 @@ export default function HomePage() {
   };
 
   const fetchRecommendations = async (selectedGenres: number[]) => {
-    setLoading(true);
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       const genreQuery = selectedGenres.join(',');
@@ -72,11 +70,12 @@ export default function HomePage() {
     } catch (err) {
       console.error(err);
     }
-    setLoading(false);
   };
 
+  // Lancer la roulette Whaou 🎰
   const fetchRandomMovie = async () => {
-    setLoading(true);
+    setIsSpinning(true);
+    setRouletteMovie(null);
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       const genreParam = preferences.length > 0 ? `&with_genres=${preferences.join(',')}` : '';
@@ -84,21 +83,18 @@ export default function HomePage() {
       
       const res = await fetch(url);
       const data = await res.json();
-      if (data.results && data.results.length > 0) {
-        const random = data.results[Math.floor(Math.random() * data.results.length)];
-        setRouletteMovie({
-          id: random.id.toString(),
-          title: random.title,
-          release_date: random.release_date,
-          vote_average: random.vote_average,
-          poster_path: random.poster_path,
-          overview: random.overview || "Aucun synopsis disponible.",
-        });
-      }
+      
+      setTimeout(() => {
+        if (data.results && data.results.length > 0) {
+          const random = data.results[Math.floor(Math.random() * data.results.length)];
+          setRouletteMovie(random);
+        }
+        setIsSpinning(false);
+      }, 800); // Petit délai pour le suspense !
     } catch (err) {
       console.error(err);
+      setIsSpinning(false);
     }
-    setLoading(false);
   };
 
   const fetchMovieExtraDetails = async (movieId: string | number) => {
@@ -192,16 +188,39 @@ export default function HomePage() {
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
-        {/* HEADER AVEC BULLE PROFIL EN HAUT À DROITE */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <div>
-            <h1 style={{ fontSize: '28px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
-              CineMatch 🎬
-            </h1>
-            <p style={{ fontSize: '12px', color: '#A1A1AA', margin: '2px 0 0 0' }}>Assistant Cinéma & Carnet de Bord</p>
+        {/* HEADER AVEC BOUTON ACCUEIL & BULLE PROFIL */}
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* BOUTON RETOUR / ACCUEIL */}
+            {isSetupComplete && (
+              <button
+                onClick={() => setIsSetupComplete(false)}
+                title="Retour à l'accueil"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#FFF',
+                  borderRadius: '12px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                🏠 Accueil
+              </button>
+            )}
+            <div>
+              <h1 style={{ fontSize: '26px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+                CineMatch 🎬
+              </h1>
+            </div>
           </div>
 
-          {/* BULLE PROFIL / CONNEXION */}
+          {/* BULLE PROFIL */}
           <a 
             href="/profile" 
             title="Mon Profil & Espace Membre"
@@ -214,19 +233,18 @@ export default function HomePage() {
               padding: '6px 12px 6px 6px', 
               borderRadius: '30px', 
               textDecoration: 'none',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-              transition: 'all 0.2s'
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
             }}
           >
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold' }}>
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold' }}>
               👤
             </div>
-            <span style={{ fontSize: '12px', color: '#FFF', fontWeight: '600' }}>Profil / XP</span>
+            <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>Profil / XP</span>
           </a>
         </header>
 
         {/* NAVIGATION SECONDAIRE */}
-        <div style={{ display: 'flex', justifyContent: 'flex-start', gap: '8px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
           <a href="/watchlist" style={{ color: '#C084FC', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(192, 132, 252, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(192, 132, 252, 0.2)' }}>
             📌 Ma Watchlist
           </a>
@@ -238,14 +256,15 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* QUESTIONNAIRE + FILMS À L'AFFICHE */}
+        {/* CONTENU PRINCIPAL */}
         {!isSetupComplete ? (
           <div>
-            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '32px' }}>
+            {/* 1. PANNEAU SELECTION DES GENRES */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '24px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Quels sont tes genres préférés ? 🍿</h2>
               <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Sélectionne tes catégories favorites.</p>
               
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '20px' }}>
                 {GENRES_LIST.map((g) => {
                   const selected = preferences.includes(g.id);
                   return (
@@ -276,7 +295,6 @@ export default function HomePage() {
                 disabled={preferences.length === 0}
                 onClick={() => {
                   setIsSetupComplete(true);
-                  setMode('recommendations');
                   fetchRecommendations(preferences);
                 }}
                 style={{
@@ -295,6 +313,69 @@ export default function HomePage() {
               </button>
             </div>
 
+            {/* 2. ROULETTE EXPRESS "WHAOU" (PLACÉE ICI ENTRE LES DEUX SECTIONS) */}
+            <div style={{ 
+              background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(236, 72, 153, 0.15))', 
+              border: '1px solid rgba(192, 132, 252, 0.4)', 
+              borderRadius: '24px', 
+              padding: '20px', 
+              textAlign: 'center', 
+              marginBottom: '32px',
+              boxShadow: '0 10px 30px -5px rgba(147, 51, 234, 0.3)'
+            }}>
+              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '2px', color: '#FBBF24', textTransform: 'uppercase' }}>
+                🎰 Mode Surprise
+              </span>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', margin: '4px 0 12px 0', color: '#FFF' }}>
+                Tu ne sais pas quoi regarder ?
+              </h3>
+
+              <button
+                onClick={fetchRandomMovie}
+                disabled={isSpinning}
+                style={{
+                  backgroundColor: isSpinning ? '#6B21A8' : '#FBBF24',
+                  color: '#000',
+                  border: 'none',
+                  fontWeight: '800',
+                  fontSize: '14px',
+                  padding: '12px 24px',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(251, 191, 36, 0.4)',
+                  transition: 'transform 0.1s'
+                }}
+              >
+                {isSpinning ? '🎰 Tirage en cours...' : '💥 Lancer la Roulette !'}
+              </button>
+
+              {/* RÉSULTAT DE LA ROULETTE (OUVRE LA FICHE COMPLÈTE AU CLIC) */}
+              {rouletteMovie && !isSpinning && (
+                <div 
+                  onClick={() => openMovieModal(rouletteMovie)}
+                  style={{ 
+                    marginTop: '16px', 
+                    backgroundColor: 'rgba(24, 24, 27, 0.9)', 
+                    border: '1px solid rgba(255, 255, 255, 0.15)', 
+                    borderRadius: '16px', 
+                    padding: '12px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px',
+                    cursor: 'pointer' 
+                  }}
+                >
+                  <img src={`https://image.tmdb.org/t/p/w500${rouletteMovie.poster_path}`} alt={rouletteMovie.title} style={{ width: '50px', height: '70px', objectFit: 'cover', borderRadius: '8px' }} />
+                  <div style={{ textAlign: 'left', flex: 1 }}>
+                    <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>🎯 Résultat de la roulette :</span>
+                    <h4 style={{ fontSize: '14px', fontWeight: '700', margin: '2px 0 0 0', color: '#FFF' }}>{rouletteMovie.title}</h4>
+                    <p style={{ fontSize: '11px', color: '#C084FC', margin: '2px 0 0 0' }}>Clique pour voir la fiche complète →</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. SECTION FILMS À L'AFFICHE */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
                 🔥 À l'affiche au cinéma ({nowPlayingMovies.length})
@@ -317,38 +398,26 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          /* ACCUEIL PERSONNALISÉ */
+          /* VUE RECOMMANDATIONS SUR-MESURE SUR LA PAGE D'ACCUEIL */
           <div>
-            <div style={{ display: 'flex', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px', borderRadius: '16px', marginBottom: '20px' }}>
-              <button onClick={() => setMode('recommendations')} style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '12px', backgroundColor: mode === 'recommendations' ? '#9333EA' : 'transparent', color: '#FFF', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>🎯 Pour toi</button>
-              <button onClick={() => { setMode('roulette'); fetchRandomMovie(); }} style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '12px', backgroundColor: mode === 'roulette' ? '#9333EA' : 'transparent', color: '#FFF', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>🎰 Roulette Express</button>
-            </div>
-
-            {mode === 'recommendations' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
-                {recommendedMovies.map((item) => (
-                  <div key={item.id} onClick={() => openMovieModal(item)} style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
-                    <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
-                    <div style={{ padding: '10px' }}>
-                      <h3 style={{ fontSize: '11px', fontWeight: '700', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
-                      <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {item.vote_average?.toFixed(1)}</span>
-                    </div>
+            <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px', color: '#C084FC' }}>
+              🎯 Recommandés selon tes choix ({recommendedMovies.length})
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
+              {recommendedMovies.map((item) => (
+                <div key={item.id} onClick={() => openMovieModal(item)} style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
+                  <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
+                  <div style={{ padding: '10px' }}>
+                    <h3 style={{ fontSize: '11px', fontWeight: '700', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
+                    <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {item.vote_average?.toFixed(1)}</span>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {mode === 'roulette' && rouletteMovie && (
-              <div onClick={() => openMovieModal(rouletteMovie)} style={{ maxWidth: '360px', margin: '0 auto', backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '20px', cursor: 'pointer' }}>
-                <img src={`https://image.tmdb.org/t/p/w500${rouletteMovie.poster_path}`} alt={rouletteMovie.title} style={{ width: '100%', height: '260px', objectFit: 'cover', borderRadius: '16px', marginBottom: '12px' }} />
-                <h2 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 6px 0' }}>{rouletteMovie.title}</h2>
-                <p style={{ fontSize: '12px', color: '#D4D4D8', lineHeight: '1.4' }}>{rouletteMovie.overview}</p>
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* MODALE FICHE FILM COMPLÈTE */}
+        {/* MODALE FICHE FILM UNIFIÉE (MEME STRUCTURE POUR TOUS LES FILMS) */}
         {selectedMovieDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
