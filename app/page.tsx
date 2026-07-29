@@ -230,7 +230,7 @@ export default function HomePage() {
     }
   };
 
-  // RECHERCHE PAR ASSISTANT IA (VRAIE RECHERCHE SÉMANTIQUE GEMINI)
+  // RECHERCHE PAR ASSISTANT IA (AVEC DIAGNOSTIC D'ERREURS DÉTAILLÉ)
   const handleAiSearch = async () => {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
@@ -239,7 +239,6 @@ export default function HomePage() {
     try {
       const API_KEY_TMDB = '93388a6035cae903edcb4051e1eb6e7b';
 
-      // 1. Demande à notre route API Gemini d'analyser le concept
       const aiRes = await fetch('/api/ai-recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -248,14 +247,13 @@ export default function HomePage() {
 
       const aiData = await aiRes.json();
 
-      if (!aiData.recommendations || aiData.recommendations.length === 0) {
-        setFeedback('🤖 L\'assistant n\'a pas trouvé de réponse. Réessaie !');
-        setTimeout(() => setFeedback(null), 3000);
+      if (!aiRes.ok || !aiData.recommendations) {
+        setFeedback(`🤖 ${aiData.error || 'Erreur lors de l\'appel IA'}`);
+        setTimeout(() => setFeedback(null), 6000);
         setAiLoading(false);
         return;
       }
 
-      // 2. Récupération des visuels TMDB pour chaque film suggéré par l'IA
       const fetchedResults: any[] = [];
 
       for (const rec of aiData.recommendations) {
@@ -275,13 +273,13 @@ export default function HomePage() {
       if (fetchedResults.length > 0) {
         setAiResults(fetchedResults);
       } else {
-        setFeedback('🤖 Impossible de charger les fiches des films suggérés.');
-        setTimeout(() => setFeedback(null), 3000);
+        setFeedback('🤖 Aucun résultat trouvé sur TMDB pour les titres suggérés.');
+        setTimeout(() => setFeedback(null), 4000);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setFeedback('⚠️ Erreur lors de la recherche IA');
-      setTimeout(() => setFeedback(null), 3000);
+      setFeedback('⚠️ Erreur de connexion avec le serveur');
+      setTimeout(() => setFeedback(null), 4000);
     }
     setAiLoading(false);
   };
@@ -598,7 +596,7 @@ export default function HomePage() {
         </div>
 
         {feedback && (
-          <div style={{ position: 'fixed', bottom: '20px', right: '20px', backgroundColor: '#9333EA', color: '#FFF', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', zIndex: 2000 }}>
+          <div style={{ position: 'fixed', bottom: '20px', right: '20px', backgroundColor: '#9333EA', color: '#FFF', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', zIndex: 2000, maxWidth: '350px' }}>
             {feedback}
           </div>
         )}
