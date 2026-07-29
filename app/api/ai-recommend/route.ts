@@ -24,9 +24,9 @@ export async function POST(req: Request) {
     2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
     [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
 
-    // Modèle gratuit standard gemini-1.5-flash sur l'API v1beta
+    // Modèle gemini-2.0-flash sur l'API stable (v1)
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
     if (!geminiRes.ok) {
       return NextResponse.json({ 
-        error: `Erreur Google AI (${geminiRes.status}): ${geminiData.error?.message || 'Quota temporairement atteint, réessaye dans quelques secondes !'}` 
+        error: `Erreur Google AI (${geminiRes.status}): ${geminiData.error?.message || 'Problème de génération'}` 
       }, { status: geminiRes.status });
     }
 
