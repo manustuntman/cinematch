@@ -23,10 +23,11 @@ export default function ProfilePage() {
 
   const fetchStats = async () => {
     try {
-      const { data, error } = await supabase.from('watchlist').select('status');
+      const { data, error } = await supabase.from('watchlist').select('*');
       if (error) throw error;
 
       if (data) {
+        // Filtrage direct et rigoureux en JS
         const watched = data.filter(item => item.status === 'watched').length;
         const toWatch = data.filter(item => item.status === 'to_watch').length;
         setStats({ totalWatched: watched, totalToWatch: toWatch });
@@ -65,7 +66,7 @@ export default function ProfilePage() {
           <h1 style={{ fontSize: '20px', fontWeight: '800', margin: 0, background: 'linear-gradient(to right, #C084FC, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Mon Profil & XP 👤
           </h1>
-          <div style={{ width: '60px' }}></div> {/* Pour équilibrer le header */}
+          <div style={{ width: '60px' }}></div>
         </div>
 
         {loading ? (
