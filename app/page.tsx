@@ -3,15 +3,13 @@
 import { useState } from 'react';
 
 export default function HomePage() {
-  const [imgError, setImgError] = useState(false);
-  
-  const movie = {
+  const [movie] = useState({
     title: 'Edge of Tomorrow',
     year: '2014',
     rating: 7.9,
     poster: 'https://m.media-amazon.com/images/M/MVBMTgwNTcxMzU4MV5BMl5BanBnXkFtZTgwMzE2ODA1MTE@._V1_FMjpg_UX1000_.jpg',
     overview: 'Dans un futur proche, des hordes d extraterrestres ont envahi la Terre. Le commandant William Cage est envoyé au front...',
-  };
+  });
 
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
@@ -34,22 +32,14 @@ export default function HomePage() {
           </span>
         </div>
 
-        {/* Poster avec sécurité anti-image brisée */}
-        <div className="relative h-64 w-full rounded-2xl overflow-hidden mb-4 shadow-lg bg-zinc-900 flex items-center justify-center">
-          {!imgError ? (
-            <img 
-              src={movie.poster} 
-              alt={movie.title} 
-              onError={() => setImgError(true)}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-purple-900 to-slate-900 flex flex-col items-center justify-center p-4 text-center">
-              <span className="text-4xl mb-2">🎬</span>
-              <span className="font-bold text-sm text-purple-200">{movie.title}</span>
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent p-4 flex flex-col justify-end pointer-events-none">
+        {/* Poster */}
+        <div className="relative h-64 w-full rounded-2xl overflow-hidden mb-4 shadow-lg bg-zinc-900">
+          <img 
+            src={movie.poster} 
+            alt={movie.title} 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent p-4 flex flex-col justify-end">
             <h2 className="text-xl font-bold">{movie.title} <span className="text-sm font-normal text-gray-400">({movie.year})</span></h2>
           </div>
         </div>
@@ -76,7 +66,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Lien vers le Profil */}
+      {/* Navigation rapide vers le Profil */}
       <a href="/profile" className="mt-6 text-xs text-purple-400 font-semibold hover:underline">
         👤 Voir mon Profil Utilisateur & Badges →
       </a>
