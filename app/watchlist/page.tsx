@@ -9,7 +9,6 @@ export default function WatchlistPage() {
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // État pour la modale de modification de la fiche / carnet de bord
   const [selectedMovie, setSelectedMovie] = useState<any>(null);
   const [movieDetailsExt, setMovieDetailsExt] = useState<{ director: string; cast: string[]; providers: any[]; trailerKey: string | null }>({
     director: '',
@@ -19,7 +18,6 @@ export default function WatchlistPage() {
   });
   const [loadingExt, setLoadingExt] = useState(false);
 
-  // Champs modifiables du carnet de bord
   const [userNotes, setUserNotes] = useState('');
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -37,31 +35,34 @@ export default function WatchlistPage() {
     setLoading(false);
   };
 
-  // Charger les détails TMDB (réalisateur, casting, streaming, trailer) lors du clic sur un film
-  const fetchMovieExtraDetails = async (movieId: string | number) => {
+  const fetchMovieExtraDetails = async (movieId: string | number, mediaType: string = 'movie') => {
     setLoadingExt(true);
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
+      const type = mediaType || 'movie';
       
-      const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${API_KEY}&language=fr-FR`);
+      const creditsRes = await fetch(`https://api.themoviedb.org/3/${type}/${movieId}/credits?api_key=${API_KEY}&language=fr-FR`);
       const creditsData = await creditsRes.json();
       
-      const directorObj = creditsData.crew?.find((member: any) => member.job === 'Director');
+      const directorObj = type === 'movie' 
+        ? creditsData.crew?.find((member: any) => member.job === 'Director')
+        : creditsData.crew?.find((member: any) => member.job === 'Executive Producer');
+
       const directorName = directorObj ? directorObj.name : 'Non renseigné';
       const topCast = creditsData.cast ? creditsData.cast.slice(0, 4).map((c: any) => c.name) : [];
 
-      const providersRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/watch/providers?api_key=${API_KEY}`);
+      const providersRes = await fetch(`https://api.themoviedb.org/3/${type}/${movieId}/watch/providers?api_key=${API_KEY}`);
       const providersData = await providersRes.json();
       const flatrate = providersData.results?.FR?.flatrate || [];
 
-      let videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=fr-FR`);
+      let videoRes = await fetch(`https://api.themoviedb.org/3/${type}/${movieId}/videos?api_key=${API_KEY}&language=fr-FR`);
       let videoData = await videoRes.json();
-      let trailer = videoData.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
+      let trailer = videoData.results?.find((v: any) => (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube');
       
       if (!trailer) {
-        videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=en-US`);
+        videoRes = await fetch(`https://api.themoviedb.org/3/${type}/${movieId}/videos?api_key=${API_KEY}&language=en-US`);
         videoData = await videoRes.json();
-        trailer = videoData.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
+        trailer = videoData.results?.find((v: any) => (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube');
       }
 
       setMovieDetailsExt({
@@ -78,17 +79,13 @@ export default function WatchlistPage() {
   };
 
   const openMovieModal = async (movie: any) => {
-    setSelectedMovieDetailState(movie);
+    setSelectedMovie(movie);
     setUserNotes(movie.user_notes || '');
     setUserRating(movie.user_rating || 0);
     setSelectedTags(movie.user_tags || []);
     if (movie.movie_id) {
-      fetchMovieExtraDetails(movie.movie_id);
+      fetchMovieExtraDetails(movie.movie_id, movie.media_type);
     }
-  };
-
-  const setSelectedMovieDetailState = (movie: any) => {
-    setSelectedMovie(movie);
   };
 
   const toggleTag = (tag: string) => {
@@ -99,7 +96,6 @@ export default function WatchlistPage() {
     }
   };
 
-  // Mettre à jour le film dans Supabase (notes, statut)
   const updateMovieInSupabase = async (newStatus?: 'to_watch' | 'watched') => {
     if (!selectedMovie) return;
     setFeedback(null);
@@ -118,7 +114,7 @@ export default function WatchlistPage() {
         .eq('id', selectedMovie.id);
 
       if (error) throw error;
-      setFeedback('✨ Carnet de bord mis à jour !');
+      setFeedback('✨ Mis à jour avec succès !');
       setSelectedMovie(null);
       fetchWatchlist();
     } catch (err) {
@@ -183,7 +179,7 @@ export default function WatchlistPage() {
         ) : watchlist.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#A1A1AA' }}>
             <p style={{ fontSize: '16px', marginBottom: '8px' }}>Ta liste est vide pour l'instant 📭</p>
-            <p style={{ fontSize: '12px' }}>explore l'accueil pour ajouter tes premiers films !</p>
+            <p style={{ fontSize: '12px' }}>Explore l'accueil pour ajouter tes premiers films ou séries !</p>
           </div>
         ) : (
           <div>
@@ -233,14 +229,13 @@ export default function WatchlistPage() {
           </div>
         )}
 
-        {/* MODALE DE GESTION DU FILM DE LA WATCHLIST (AVEC CARNET DE BORD) */}
+        {/* MODALE DE GESTION DU FILM DE LA WATCHLIST */}
         {selectedMovie && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
               
               <button onClick={() => setSelectedMovie(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700', zIndex: 10 }}>✕</button>
 
-              {/* Poster + Infos */}
               <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                 <img src={selectedMovie.poster_path} alt={selectedMovie.title} style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
                 <div style={{ flex: 1 }}>
@@ -250,7 +245,7 @@ export default function WatchlistPage() {
                   </span>
                   
                   <p style={{ fontSize: '11px', color: '#A1A1AA', margin: '0 0 4px 0' }}>
-                    <strong style={{ color: '#FFF' }}>Réalisateur :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.director || 'N/A'}
+                    <strong style={{ color: '#FFF' }}>Réalisateur / Prod :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.director || 'N/A'}
                   </p>
                   <p style={{ fontSize: '11px', color: '#A1A1AA', margin: 0 }}>
                     <strong style={{ color: '#FFF' }}>Casting :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.cast.length > 0 ? movieDetailsExt.cast.join(', ') : 'N/A'}
@@ -258,7 +253,6 @@ export default function WatchlistPage() {
                 </div>
               </div>
 
-              {/* TRAILER YOUTUBE S'IL EXISTE */}
               {movieDetailsExt.trailerKey && (
                 <div style={{ marginBottom: '20px' }}>
                   <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
@@ -269,20 +263,17 @@ export default function WatchlistPage() {
                       src={`https://www.youtube.com/embed/${movieDetailsExt.trailerKey}`}
                       title="Bande-annonce"
                       style={{ width: '100%', height: '100%', border: 'none' }}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
                     />
                   </div>
                 </div>
               )}
 
-              {/* CARNET DE BORD & MODIFICATION */}
               <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', margin: '0 0 12px 0' }}>
                   📓 Carnet de Bord Personnel
                 </h3>
 
-                {/* Note ⭐ */}
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Ma Note :</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -298,7 +289,6 @@ export default function WatchlistPage() {
                   </div>
                 </div>
 
-                {/* Tags */}
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Ambiance :</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -325,13 +315,12 @@ export default function WatchlistPage() {
                   </div>
                 </div>
 
-                {/* Notes texte */}
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Mes remarques :</label>
                   <textarea
                     value={userNotes}
                     onChange={(e) => setUserNotes(e.target.value)}
-                    placeholder="Écris tes notes sur ce film..."
+                    placeholder="Écris tes notes..."
                     style={{
                       width: '100%',
                       height: '70px',
@@ -348,7 +337,6 @@ export default function WatchlistPage() {
                   />
                 </div>
 
-                {/* Actions */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                   <button 
                     onClick={() => updateMovieInSupabase(selectedMovie.status === 'watched' ? 'to_watch' : 'watched')}
@@ -360,7 +348,7 @@ export default function WatchlistPage() {
                     onClick={() => updateMovieInSupabase()}
                     style={{ flex: 1, backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
                   >
-                    💾 Enregistrer notes
+                    💾 Enregistrer
                   </button>
                 </div>
 
