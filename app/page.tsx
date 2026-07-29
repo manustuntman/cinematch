@@ -20,17 +20,18 @@ export default function HomePage() {
   const [preferences, setPreferences] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
-  const [trendingMovies, setTrendingMovies] = useState<any[]>([]); // Tendances actuelles (semaine)
+  const [trendingMovies, setTrendingMovies] = useState<any[]>([]);
   const [recommendedMovies, setRecommendedMovies] = useState<any[]>([]);
   const [rouletteMovie, setRouletteMovie] = useState<any>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedMovieDetail, setSelectedMovieDetail] = useState<any>(null);
 
-  // Crédits, Plateformes & Bande-annonce
-  const [movieDetailsExt, setMovieDetailsExt] = useState<{ director: string; cast: string[]; providers: any[]; trailerKey: string | null }>({
+  // Crédits, Plateformes (Payantes et Gratuites) & Bande-annonce
+  const [movieDetailsExt, setMovieDetailsExt] = useState<{ director: string; cast: string[]; providers: any[]; freeProviders: any[]; trailerKey: string | null }>({
     director: '',
     cast: [],
     providers: [],
+    freeProviders: [],
     trailerKey: null,
   });
   const [loadingExt, setLoadingExt] = useState(false);
@@ -42,7 +43,6 @@ export default function HomePage() {
 
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // Charger les Tendances Actuelles de la semaine (mélange blockbusters récents & tops notes)
   const fetchTrending = async () => {
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
@@ -109,9 +109,12 @@ export default function HomePage() {
       const directorName = directorObj ? directorObj.name : 'Non renseigné';
       const topCast = creditsData.cast ? creditsData.cast.slice(0, 4).map((c: any) => c.name) : [];
 
+      // Plateformes de streaming (Abonnements payants + Gratuits / Replay FR)
       const providersRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/watch/providers?api_key=${API_KEY}`);
       const providersData = await providersRes.json();
-      const flatrate = providersData.results?.FR?.flatrate || [];
+      const frProviders = providersData.results?.FR || {};
+      const flatrate = frProviders.flatrate || []; // Netflix, Prime, etc.
+      const free = frProviders.free || [];         // M6+, TF1+, France.tv, etc.
 
       let videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=fr-FR`);
       let videoData = await videoRes.json();
@@ -128,11 +131,12 @@ export default function HomePage() {
         director: directorName,
         cast: topCast,
         providers: flatrate,
+        freeProviders: free,
         trailerKey: trailer ? trailer.key : null,
       });
     } catch (err) {
       console.error("Erreur détails étendus :", err);
-      setMovieDetailsExt({ director: 'N/A', cast: [], providers: [], trailerKey: null });
+      setMovieDetailsExt({ director: 'N/A', cast: [], providers: [], freeProviders: [], trailerKey: null });
     }
     setLoadingExt(false);
   };
@@ -437,46 +441,72 @@ export default function HomePage() {
                 {selectedMovieDetail.overview}
               </p>
 
-              {/* STREAMING OU CINÉMA */}
+              {/* STREAMING GRATUIT (REPLAY / M6+) & ABONNEMENTS OU CINÉMA */}
               <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
                   📺 Où le regarder :
                 </span>
                 {loadingExt ? (
                   <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Recherche des disponibilités...</span>
-                ) : movieDetailsExt.providers.length > 0 ? (
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {movieDetailsExt.providers.map((provider: any) => (
-                      <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px 8px', borderRadius: '8px' }}>
-                        <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
-                        <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
-                      </div>
-                    ))}
-                  </div>
                 ) : (
                   <div>
-                    <span style={{ fontSize: '11px', color: '#FBBF24', fontWeight: '700', display: 'block', marginBottom: '8px' }}>
-                      🍿 Actuellement au cinéma !
-                    </span>
-                    <a
-                      href={`https://www.google.com/search?q=seance+cinema+${encodeURIComponent(selectedMovieDetail.title)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        backgroundColor: '#9333EA',
-                        color: '#FFF',
-                        textDecoration: 'none',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        padding: '8px 12px',
-                        borderRadius: '10px'
-                      }}
-                    >
-                      📍 Voir les séances près de chez moi →
-                    </a>
+                    {/* 1. PLATEFORMES GRATUITES / REPLAY (M6+, etc.) */}
+                    {movieDetailsExt.freeProviders.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <span style={{ fontSize: '10px', color: '#4ADE80', fontWeight: '700', display: 'block', marginBottom: '4px' }}>🎁 Gratuit / Replay :</span>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                          {movieDetailsExt.freeProviders.map((provider: any) => (
+                            <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.2)', padding: '4px 8px', borderRadius: '8px' }}>
+                              <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+                              <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 2. ABONNEMENTS PAYANTS (Netflix, Prime...) */}
+                    {movieDetailsExt.providers.length > 0 && (
+                      <div style={{ marginBottom: movieDetailsExt.freeProviders.length > 0 ? '8px' : '0' }}>
+                        <span style={{ fontSize: '10px', color: '#C084FC', fontWeight: '700', display: 'block', marginBottom: '4px' }}>✨ Abonnement :</span>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                          {movieDetailsExt.providers.map((provider: any) => (
+                            <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px 8px', borderRadius: '8px' }}>
+                              <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+                              <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 3. SI RIEN N'EST DISPO -> CINÉMA */}
+                    {movieDetailsExt.freeProviders.length === 0 && movieDetailsExt.providers.length === 0 && (
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#FBBF24', fontWeight: '700', display: 'block', marginBottom: '8px' }}>
+                          🍿 Actuellement au cinéma !
+                        </span>
+                        <a
+                          href={`https://www.google.com/search?q=seance+cinema+${encodeURIComponent(selectedMovieDetail.title)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            backgroundColor: '#9333EA',
+                            color: '#FFF',
+                            textDecoration: 'none',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            padding: '8px 12px',
+                            borderRadius: '10px'
+                          }}
+                        >
+                          📍 Voir les séances près de chez moi →
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
