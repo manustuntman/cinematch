@@ -119,6 +119,7 @@ export default function HomePage() {
 
   const [trendingMedia, setTrendingMedia] = useState<any[]>([]);
   const [recommendedMedia, setRecommendedMedia] = useState<any[]>([]);
+  const [carouselMedia, setCarouselMedia] = useState<any[]>([]);
   const [rouletteMedia, setRouletteMedia] = useState<any>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedMediaDetail, setSelectedMediaDetail] = useState<any>(null);
@@ -198,6 +199,7 @@ export default function HomePage() {
       const data = await res.json();
       if (data.results) {
         setTrendingMedia(data.results.slice(0, 20));
+        setCarouselMedia(data.results.slice(0, 12));
       }
     } catch (err) {
       console.error(err);
@@ -417,6 +419,23 @@ export default function HomePage() {
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      
+      {/* ANIMATION CSS POUR LE CAROUSEL FLUIDE */}
+      <style jsx global>{`
+        @keyframes scrollMarquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+          display: flex;
+          width: max-content;
+          animation: scrollMarquee 35s linear infinite;
+        }
+        .animate-marquee:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
         {/* HEADER */}
@@ -486,7 +505,7 @@ export default function HomePage() {
         </div>
 
         {/* NAVIGATION SECONDAIRE */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           {isSetupComplete ? (
             <button
               onClick={() => setIsSetupComplete(false)}
@@ -523,24 +542,28 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* BANDEAU D'AMBIANCE STYLÉ */}
-        {!isSetupComplete && (
-          <div style={{ 
-            backgroundColor: 'rgba(147, 51, 234, 0.08)', 
-            border: '1px solid rgba(192, 132, 252, 0.25)', 
-            borderRadius: '16px', 
-            padding: '12px 16px', 
-            textAlign: 'center', 
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px'
-          }}>
-            <span style={{ fontSize: '15px' }}>🌟</span>
-            <p style={{ fontSize: '12px', color: '#E9D5FF', margin: 0, fontWeight: '600' }}>
-              Bienvenue dans ton QG ciné ! • Trouve ton programme sur-mesure • Zéro prise de tête.
-            </p>
+        {/* CAROUSEL FLUIDE EN MOUVEMENT (DISCRET ET VIF) */}
+        {!isSetupComplete && carouselMedia.length > 0 && (
+          <div style={{ marginBottom: '20px', overflow: 'hidden', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(24, 24, 27, 0.4)', padding: '10px 0', position: 'relative' }}>
+            <div className="animate-marquee" style={{ display: 'flex', gap: '12px' }}>
+              {/* On duplique le tableau pour créer une boucle fluide infinie */}
+              {[...carouselMedia, ...carouselMedia].map((item, idx) => (
+                <div 
+                  key={`${item.id}-${idx}`}
+                  onClick={() => openMediaModal(item)}
+                  style={{ width: '80px', height: '115px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, cursor: 'pointer', position: 'relative', border: '1px solid rgba(255,255,255,0.15)' }}
+                >
+                  <img 
+                    src={item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : 'https://via.placeholder.com/80x115'} 
+                    alt="" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.75)', padding: '2px 4px', fontSize: '8px', color: '#FBBF24', textAlign: 'center', fontWeight: '700' }}>
+                    ★ {item.vote_average?.toFixed(1)}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
