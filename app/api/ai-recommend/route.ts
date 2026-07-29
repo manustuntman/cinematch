@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ 
-        error: 'Clé API absente dans les variables d environnement Vercel.' 
+        error: 'Clé API absente dans Vercel (GEMINI_API_KEY).' 
       }, { status: 500 });
     }
 
@@ -24,9 +24,9 @@ export async function POST(req: Request) {
     2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
     [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
 
-    // Appel direct au modèle Gemini 2.5 Flash
-    let geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    // Utilisation de l'alias officiel 'gemini-flash'
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36,25 +36,11 @@ export async function POST(req: Request) {
       }
     );
 
-    // Si le modèle 2.5 n'est pas encore actif sur ton projet, bascule sur gemini-2.0-flash
-    if (!geminiRes.ok) {
-      geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: systemPrompt }] }]
-          })
-        }
-      );
-    }
-
     const geminiData = await geminiRes.json();
 
     if (!geminiRes.ok) {
       return NextResponse.json({ 
-        error: `Erreur Google AI (${geminiRes.status}): ${geminiData.error?.message || 'Erreur lors de l appel à l IA'}` 
+        error: `Erreur Google AI (${geminiRes.status}): ${geminiData.error?.message || 'Problème lors de la génération'}` 
       }, { status: geminiRes.status });
     }
 
