@@ -24,24 +24,34 @@ export async function POST(req: Request) {
     2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
     [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
 
-    // Modèle officiel pour l'API REST Gemini
-    const geminiRes = await fetch(
+    // Liste des URLs à tester en cas de 404 (de la plus stable à la plus récente)
+    const endpoints = [
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
+    ];
+
+    let geminiRes: Response | null = null;
+    let geminiData: any = null;
+
+    // Essaie chaque endpoint jusqu'à ce qu'un fonctionne
+    for (const url of endpoints) {
+      geminiRes = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: systemPrompt }] }]
         })
-      }
-    );
+      });
 
-    const geminiData = await geminiRes.json();
+      geminiData = await geminiRes.json();
+      if (geminiRes.ok) break; // Succès ! On sort de la boucle
+    }
 
-    if (!geminiRes.ok) {
+    if (!geminiRes || !geminiRes.ok) {
       return NextResponse.json({ 
-        error: `Erreur Google AI (${geminiRes.status}): ${geminiData.error?.message || 'Problème lors de la génération'}` 
-      }, { status: geminiRes.status });
+        error: `Erreur Google AI (${geminiRes?.status}): ${geminiData?.error?.message || 'Problème de modèle'}` 
+      }, { status: geminiRes?.status || 500 });
     }
 
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
