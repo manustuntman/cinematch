@@ -15,7 +15,7 @@ export default function HomePage() {
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       
       {/* Header CineMatch */}
-      <div style={{ textCenter: 'center', marginBottom: '24px', textAlign: 'center' }}>
+      <div style={{ marginBottom: '24px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '32px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
           CineMatch 🎬
         </h1>
