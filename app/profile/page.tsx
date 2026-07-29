@@ -1,79 +1,69 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function ProfilePage() {
-  const [user] = useState({
-    username: 'Alex',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-    xp: 1250,
-    level: 5,
-    favoriteGenre: 'Sci-Fi / Intemporel',
-    watchlistCount: 14,
-    watchedCount: 42,
-    badges: [
-      { id: 1, name: 'Cinéphile', icon: '🎬', description: 'Plus de 30 films vus' },
-      { id: 2, name: 'Explorateur Télépore', icon: '⏳', description: 'Fan de Voyages Temporels' },
-      { id: 3, name: 'Pionnier', icon: '🚀', description: 'Membre de la bêta CineMatch' },
-    ],
-  });
+  const [stats, setStats] = useState({ watchedCount: 0, toWatchCount: 0, xp: 0, level: 1, rank: 'Cinéphile Débutant' });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      setLoading(true);
+      const { data } = await supabase.from('watchlist').select('status');
+      if (data) {
+        const watched = data.filter((m) => m.status === 'watched').length;
+        const toWatch = data.filter((m) => m.status === 'to_watch').length;
+        const totalXp = watched * 50;
+        const currentLevel = Math.floor(totalXp / 100) + 1;
+
+        let currentRank = 'Cinéphile Curieux 🍿';
+        if (currentLevel >= 3) currentRank = 'Grand Cinephile 🎬';
+        if (currentLevel >= 5) currentRank = 'Expert Sci-Fi & Cinéma 🚀';
+
+        setStats({ watchedCount: watched, toWatchCount: toWatch, xp: totalXp, level: currentLevel, rank: currentRank });
+      }
+      setLoading(false);
+    };
+    fetchStats();
+  }, []);
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      
-      {/* Bouton Retour */}
-      <div style={{ width: '100%', maxWidth: '400px', marginBottom: '20px' }}>
-        <a href="/" style={{ fontSize: '13px', color: '#A1A1AA', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-          ← Retour à CineMatch
-        </a>
-      </div>
+    <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <div style={{ maxWidth: '450px', margin: '0 auto' }}>
+        <a href="/" style={{ color: '#A1A1AA', fontSize: '12px', textDecoration: 'none', display: 'inline-block', marginBottom: '16px' }}>← Retour à la roulette</a>
 
-      {/* Carte Profil */}
-      <div style={{ width: '100%', maxWidth: '400px', borderRadius: '24px', backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', padding: '24px', boxSizing: 'border-box', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)' }}>
-        
-        {/* Header Profil */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '24px' }}>
-          <img 
-            src={user.avatar} 
-            alt={user.username} 
-            style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #C084FC', marginBottom: '12px' }}
-          />
-          <h1 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 4px 0' }}>{user.username}</h1>
-          <span style={{ backgroundColor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', fontSize: '12px', fontWeight: '700', padding: '4px 12px', borderRadius: '20px' }}>
-            Niveau {user.level} • {user.xp} XP
-          </span>
-        </div>
-
-        {/* Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-          <div style={{ backgroundColor: '#18181B', borderRadius: '16px', padding: '12px', textAlign: 'center', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: '#EC4899' }}>{user.watchedCount}</div>
-            <div style={{ fontSize: '11px', color: '#A1A1AA', marginTop: '2px' }}>Films vus</div>
+        {/* Profil Card */}
+        <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)' }}>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#9333EA', margin: '0 auto 16px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>
+            🎬
           </div>
-          <div style={{ backgroundColor: '#18181B', borderRadius: '16px', padding: '12px', textAlign: 'center', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: '#FBBF24' }}>{user.watchlistCount}</div>
-            <div style={{ fontSize: '11px', color: '#A1A1AA', marginTop: '2px' }}>Watchlist</div>
-          </div>
-        </div>
+          <h1 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 4px 0' }}>Membre CineMatch</h1>
+          <p style={{ color: '#FBBF24', fontSize: '13px', fontWeight: '700', margin: '0 0 20px 0' }}>{stats.rank}</p>
 
-        {/* Badges */}
-        <div>
-          <h2 style={{ fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: '#A1A1AA', margin: '0 0 12px 0' }}>
-            Badges Débloqués
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {user.badges.map((badge) => (
-              <div key={badge.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#18181B', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <span style={{ fontSize: '20px' }}>{badge.icon}</span>
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: '700' }}>{badge.name}</div>
-                  <div style={{ fontSize: '11px', color: '#A1A1AA' }}>{badge.description}</div>
-                </div>
-              </div>
-            ))}
+          {/* XP & Level */}
+          <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '16px', padding: '16px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '700', marginBottom: '8px' }}>
+              <span>Niveau {stats.level}</span>
+              <span style={{ color: '#C084FC' }}>{stats.xp} XP</span>
+            </div>
+            <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: `${stats.xp % 100}%`, height: '100%', backgroundColor: '#9333EA', transition: 'width 0.3s' }} />
+            </div>
+          </div>
+
+          {/* Stats Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '12px' }}>
+              <span style={{ fontSize: '20px', fontWeight: '800', color: '#10B981', display: 'block' }}>{stats.watchedCount}</span>
+              <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Films Vus</span>
+            </div>
+            <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '12px' }}>
+              <span style={{ fontSize: '20px', fontWeight: '800', color: '#FBBF24', display: 'block' }}>{stats.toWatchCount}</span>
+              <span style={{ fontSize: '11px', color: '#A1A1AA' }}>En Watchlist</span>
+            </div>
           </div>
         </div>
-
       </div>
     </main>
   );
