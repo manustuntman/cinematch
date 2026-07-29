@@ -6,9 +6,7 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ 
-        error: 'Clé API absente dans Vercel (GEMINI_API_KEY).' 
-      }, { status: 500 });
+      return NextResponse.json({ error: 'Clé API manquante sur Vercel' }, { status: 500 });
     }
 
     if (!prompt) {
@@ -24,9 +22,8 @@ export async function POST(req: Request) {
     2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
     [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
 
-    // Modèle gemini-2.0-flash sur l'API stable (v1)
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36,21 +33,17 @@ export async function POST(req: Request) {
       }
     );
 
-    const geminiData = await geminiRes.json();
+    const data = await res.json();
 
-    if (!geminiRes.ok) {
-      return NextResponse.json({ 
-        error: `Erreur Google AI (${geminiRes.status}): ${geminiData.error?.message || 'Problème de génération'}` 
-      }, { status: geminiRes.status });
+    if (!res.ok) {
+      return NextResponse.json({ error: data.error?.message || 'Erreur API' }, { status: res.status });
     }
 
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-    const cleanJsonText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const recommendations = JSON.parse(cleanJsonText);
-
-    return NextResponse.json({ recommendations });
-  } catch (error: any) {
-    console.error('Erreur serveur:', error);
-    return NextResponse.json({ error: `Erreur serveur: ${error?.message || 'Inconnue'}` }, { status: 500 });
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+    const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    
+    return NextResponse.json({ recommendations: JSON.parse(clean) });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
