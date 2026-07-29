@@ -342,7 +342,6 @@ export default function HomePage() {
     const movieIdStr = selectedMediaDetail.id.toString();
 
     try {
-      // 1. Vérifier si le film/série existe déjà dans la base
       const { data: existing, error: checkError } = await supabase
         .from('watchlist')
         .select('id')
@@ -357,7 +356,6 @@ export default function HomePage() {
         return;
       }
 
-      // 2. Sinon, on procède à l'insertion
       const { error } = await supabase.from('watchlist').insert([
         {
           movie_id: movieIdStr,
@@ -522,6 +520,27 @@ export default function HomePage() {
         {feedback && (
           <div style={{ position: 'fixed', bottom: '20px', right: '20px', backgroundColor: '#9333EA', color: '#FFF', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', zIndex: 2000 }}>
             {feedback}
+          </div>
+        )}
+
+        {/* BANDEAU D'AMBIANCE STYLÉ */}
+        {!isSetupComplete && (
+          <div style={{ 
+            backgroundColor: 'rgba(147, 51, 234, 0.08)', 
+            border: '1px solid rgba(192, 132, 252, 0.25)', 
+            borderRadius: '16px', 
+            padding: '12px 16px', 
+            textAlign: 'center', 
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '15px' }}>🌟</span>
+            <p style={{ fontSize: '12px', color: '#E9D5FF', margin: 0, fontWeight: '600' }}>
+              Bienvenue dans ton QG ciné ! • Trouve ton programme sur-mesure • Zéro prise de tête.
+            </p>
           </div>
         )}
 
