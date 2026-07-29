@@ -6,26 +6,19 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error('GEMINI_API_KEY manquante dans les variables d environnemnt Vercel');
-      return NextResponse.json({ error: 'Clé API non configurée' }, { status: 500 });
-    }
-
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt requis' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Clé API absente. Vérifie GEMINI_API_KEY sur Vercel et fais un Redeploy.' 
+      }, { status: 500 });
     }
 
     const typeLabel = mediaType === 'tv' ? 'séries TV' : 'films';
 
-    const systemPrompt = `Tu es un expert cinéma et recommandeur ultra-pointu.
-    Propose exactement 5 ${typeLabel} qui correspondent au CONCEPT et à l'AMBIANCE de cette demande : "${prompt}".
-    Règles :
-    1. Ne cherche pas juste les mots dans le titre, trouve de véritables œuvres qui traitent du thème (ex: voyage dans le temps = Predestination, Looper, L'Effet Papillon, Interstellar, etc.).
-    2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
-    [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
+    const systemPrompt = `Tu es un expert cinéma. Propose exactement 5 ${typeLabel} correspondant au CONCEPT : "${prompt}".
+    Réponds STRICTEMENT sous forme d'un tableau JSON d'objets : [{"title": "Titre", "reason": "Raison"}]`;
 
-    // Essai avec gemini-2.5-flash, puis fallback sur gemini-2.0-flash si besoin
-    let geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    // Appel à l'API Gemini 1.5 Flash
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -35,29 +28,22 @@ export async function POST(req: Request) {
       }
     );
 
+    const geminiData = await geminiRes.json();
+
     if (!geminiRes.ok) {
-      geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: systemPrompt }] }]
-          })
-        }
-      );
+      console.error('Erreur retournée par Google:', geminiData);
+      return NextResponse.json({ 
+        error: `Erreur Google AI (${geminiRes.status}): ${geminiData.error?.message || 'Problème de clé ou de quota'}` 
+      }, { status: geminiRes.status });
     }
 
-    const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-    
-    // Nettoyage des balises Markdown ```json
     const cleanJsonText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
     const recommendations = JSON.parse(cleanJsonText);
 
     return NextResponse.json({ recommendations });
-  } catch (error) {
-    console.error('Erreur API Gemini:', error);
-    return NextResponse.json({ error: 'Erreur lors de la génération IA' }, { status: 500 });
+  } catch (error: any) {
+    console.error('Erreur serveur:', error);
+    return NextResponse.json({ error: `Erreur serveur: ${error?.message || 'Inconnue'}` }, { status: 500 });
   }
 }
