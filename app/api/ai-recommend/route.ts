@@ -4,9 +4,10 @@ export async function POST(req: Request) {
   try {
     const { prompt, mediaType } = await req.json();
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    // On utilise la clé GROQ que tu viens de configurer sur Vercel
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: 'Clé API manquante sur Vercel' }, { status: 500 });
+      return NextResponse.json({ error: 'Clé API GROQ manquante sur Vercel' }, { status: 500 });
     }
 
     if (!prompt) {
@@ -15,36 +16,43 @@ export async function POST(req: Request) {
 
     const typeLabel = mediaType === 'tv' ? 'séries TV' : 'films';
 
-    const systemPrompt = `Tu es un expert cinéma et recommandeur ultra-pointu.
-    Propose exactement 5 ${typeLabel} qui correspondent au CONCEPT et à l'AMBIANCE de cette demande : "${prompt}".
-    Règles :
-    1. Ne cherche pas juste les mots dans le titre, trouve de véritables œuvres qui traitent du thème.
-    2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
-    [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
-
-    // Utilisation de l'alias universel gemini-pro, ouvert à tous les comptes gratuits
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: systemPrompt }] }]
-        })
-      }
-    );
+    // Appel à l'API ultra-rapide de Groq (modèle Llama 3)
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192', 
+        messages: [
+          {
+            role: 'system',
+            content: `Tu es un expert cinéma et recommandeur ultra-pointu.
+            Trouve exactement 5 ${typeLabel} pour le concept : "${prompt}".
+            Renvoie UNIQUEMENT un tableau JSON valide. Ne dis pas bonjour, ne mets aucune balise markdown. 
+            Exemple de format attendu :
+            [{"title": "Inception", "reason": "Un voyage mental fascinant dans les rêves"}]`
+          }
+        ],
+        temperature: 0.5
+      })
+    });
 
     const data = await res.json();
 
     if (!res.ok) {
-      return NextResponse.json({ error: data.error?.message || 'Erreur API' }, { status: res.status });
+      return NextResponse.json({ error: data.error?.message || 'Erreur API Groq' }, { status: res.status });
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-    const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    // Extraction et nettoyage de la réponse pour obtenir le tableau JSON
+    const rawText = data.choices[0].message.content || '[]';
+    const clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
     
     return NextResponse.json({ recommendations: JSON.parse(clean) });
+
   } catch (err: any) {
+    console.error('Erreur serveur:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
