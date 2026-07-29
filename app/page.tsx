@@ -11,12 +11,16 @@ export default function HomePage() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // Clé API TMDB directe
-      const API_KEY = '52a5ec6696ef2c6e6df66914edbfb732'; 
+      // Ton Access Token TMDB v4
+      const TMDB_BEARER_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5MzM4OGE2MDM1Y2FlOTAzZWRjYjQwNTFlMWViNmU3YiIsIm5iZiI6MTc4NTMxMDQzNi41MzEwMDAxLCJzdWIiOiI2YTY5YWNlNDJjZmIxZmFkYWI3ODM3MjAiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.xIBYj1FjRv9R8GGsAqAITvKqwpbLvUcZqlttV3a_x8s'; 
       
-      const response = await fetch(
-        `https://api.themoviedb.org/3/movie/popular?api_key=${API_KEY}&language=fr-FR&page=1`
-      );
+      const response = await fetch('https://api.themoviedb.org/3/movie/popular?language=fr-FR&page=1', {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          Authorization: `Bearer ${TMDB_BEARER_TOKEN}`
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`Erreur TMDB (Code ${response.status})`);
