@@ -7,7 +7,7 @@ export default function HomePage() {
     title: 'Edge of Tomorrow',
     year: '2014',
     rating: 7.9,
-    poster: 'https://m.media-amazon.com/images/M/MVBMTgwNTcxMzU4MV5BMl5BanBnXkFtZTgwMzE2ODA1MTE@._V1_FMjpg_UX1000_.jpg',
+    poster: 'https://image.tmdb.org/t/p/w500/xP13L13i0J1lI9L4pM49z3B8eA4.jpg',
     overview: 'Dans un futur proche, des hordes d extraterrestres ont envahi la Terre. Le commandant William Cage est envoyé au front...',
   });
 
