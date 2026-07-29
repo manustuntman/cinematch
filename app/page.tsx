@@ -25,11 +25,12 @@ export default function HomePage() {
   const [rouletteMovie, setRouletteMovie] = useState<any>(null);
   const [selectedMovieDetail, setSelectedMovieDetail] = useState<any>(null);
 
-  // Crédits et Plateformes
-  const [movieDetailsExt, setMovieDetailsExt] = useState<{ director: string; cast: string[]; providers: any[] }>({
+  // Crédits, Plateformes & Bande-annonce (Trailer)
+  const [movieDetailsExt, setMovieDetailsExt] = useState<{ director: string; cast: string[]; providers: any[]; trailerKey: string | null }>({
     director: '',
     cast: [],
     providers: [],
+    trailerKey: null,
   });
   const [loadingExt, setLoadingExt] = useState(false);
 
@@ -100,7 +101,7 @@ export default function HomePage() {
     setLoading(false);
   };
 
-  // Récupérer le Réalisateur, le Casting et les Plateformes de streaming (FR)
+  // Récupérer le Réalisateur, le Casting, les Plateformes ET la Bande-annonce (Trailer YouTube)
   const fetchMovieExtraDetails = async (movieId: string | number) => {
     setLoadingExt(true);
     try {
@@ -117,21 +118,34 @@ export default function HomePage() {
       // 2. Plateformes de Streaming (France)
       const providersRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/watch/providers?api_key=${API_KEY}`);
       const providersData = await providersRes.json();
-      const flatrate = providersData.results?.FR?.flatrate || []; // Abonnements (Netflix, Prime, Disney, etc.)
+      const flatrate = providersData.results?.FR?.flatrate || [];
+
+      // 3. Videos / Trailer YouTube (Recherche FR puis EN si introuvable)
+      let videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=fr-FR`);
+      let videoData = await videoRes.json();
+      
+      let trailer = videoData.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
+      
+      if (!trailer) {
+        // Fallback en anglais si pas de trailer fr
+        videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=en-US`);
+        videoData = await videoRes.json();
+        trailer = videoData.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
+      }
 
       setMovieDetailsExt({
         director: directorName,
         cast: topCast,
         providers: flatrate,
+        trailerKey: trailer ? trailer.key : null,
       });
     } catch (err) {
-      console.error("Erreur lors de la récupération des détails supplémentaires :", err);
-      setMovieDetailsExt({ director: 'N/A', cast: [], providers: [] });
+      console.error("Erreur détails étendus :", err);
+      setMovieDetailsExt({ director: 'N/A', cast: [], providers: [], trailerKey: null });
     }
     setLoadingExt(false);
   };
 
-  // Ouvrir la modale et charger les données
   const openMovieModal = (movie: any) => {
     setSelectedMovieDetail(movie);
     setUserNotes('');
@@ -313,14 +327,14 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MODALE FICHE FILM (AVEC ACTEURS, RÉALISATEUR & PLATEFORMES) */}
+        {/* MODALE FICHE FILM COMPLÈTE (AVEC BANDE-ANNONCE YOUTUBE 🎬) */}
         {selectedMovieDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
               
-              <button onClick={() => setSelectedMovieDetail(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700' }}>✕</button>
+              <button onClick={() => setSelectedMovieDetail(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700', zIndex: 10 }}>✕</button>
 
-              {/* Poster + En-tête */}
+              {/* Poster + Infos */}
               <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                 <img src={`https://image.tmdb.org/t/p/w500${selectedMovieDetail.poster_path}`} alt={selectedMovieDetail.title} style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
                 <div style={{ flex: 1 }}>
@@ -329,12 +343,10 @@ export default function HomePage() {
                     ★ {selectedMovieDetail.vote_average?.toFixed(1)} / 10 (TMDB)
                   </span>
                   
-                  {/* Réalisateur */}
                   <p style={{ fontSize: '11px', color: '#A1A1AA', margin: '0 0 4px 0' }}>
                     <strong style={{ color: '#FFF' }}>Réalisateur :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.director || 'N/A'}
                   </p>
 
-                  {/* Acteurs principaux */}
                   <p style={{ fontSize: '11px', color: '#A1A1AA', margin: 0 }}>
                     <strong style={{ color: '#FFF' }}>Casting :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.cast.length > 0 ? movieDetailsExt.cast.join(', ') : 'N/A'}
                   </p>
@@ -346,7 +358,7 @@ export default function HomePage() {
                 {selectedMovieDetail.overview}
               </p>
 
-              {/* Plateformes de Streaming (Disponibilité FR) */}
+              {/* Plateformes de Streaming */}
               <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
                   📺 Disponible en streaming (FR) :
@@ -367,7 +379,33 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* SECTIONS NOTEBOOK 📓 (Notes Personnelles) */}
+              {/* SECTION BANDE-ANNONCE (TRAILER YOUTUBE) 🎬 */}
+              <div style={{ marginBottom: '20px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
+                  🎬 Bande-annonce officielle :
+                </span>
+                {loadingExt ? (
+                  <div style={{ height: '180px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A1A1AA', fontSize: '12px' }}>
+                    Chargement du trailer...
+                  </div>
+                ) : movieDetailsExt.trailerKey ? (
+                  <div style={{ position: 'relative', width: '100%', height: '200px', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    <iframe
+                      src={`https://www.youtube.com/embed/${movieDetailsExt.trailerKey}`}
+                      title="Bande-annonce"
+                      style={{ width: '100%', height: '100%', border: 'none' }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <div style={{ padding: '12px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.03)', color: '#A1A1AA', fontSize: '11px', textAlign: 'center' }}>
+                    Aucune bande-annonce vidéo disponible.
+                  </div>
+                )}
+              </div>
+
+              {/* SECTIONS NOTEBOOK 📓 */}
               <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   📓 Mon Carnet de Bord
