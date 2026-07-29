@@ -5,24 +5,26 @@ import { useState, useEffect } from 'react';
 export default function HomePage() {
   const [movie, setMovie] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Fonction pour aller chercher un film au hasard sur TMDB
   const fetchRandomMovie = async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
-      // Clé API TMDB intégrée
       const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY || '52a5ec6696ef2c6e6df66914edbfb732'; 
       
-      // On demande à TMDB les films populaires en français
       const response = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${API_KEY}&language=fr-FR&page=1`);
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
       const data = await response.json();
 
       if (data.results && data.results.length > 0) {
-        // On choisit un film au hasard parmi les résultats
         const randomIndex = Math.floor(Math.random() * data.results.length);
         const randomData = data.results[randomIndex];
 
-        // On met à jour notre affichage avec les vraies infos
         setMovie({
           title: randomData.title,
           year: randomData.release_date ? randomData.release_date.substring(0, 4) : 'N/A',
@@ -30,14 +32,16 @@ export default function HomePage() {
           poster: randomData.poster_path ? `https://image.tmdb.org/t/p/w500${randomData.poster_path}` : '',
           overview: randomData.overview || "Aucun synopsis disponible en français pour ce film.",
         });
+      } else {
+        throw new Error("Aucun résultat trouvé");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur avec l'API TMDB :", error);
+      setErrorMsg(error.message || "Impossible de charger les films.");
     }
     setLoading(false);
   };
 
-  // Se lance tout seul au démarrage de la page
   useEffect(() => {
     fetchRandomMovie();
   }, []);
@@ -56,11 +60,21 @@ export default function HomePage() {
       {/* Carte Apple Glassmorphism */}
       <div style={{ width: '100%', maxWidth: '360px', borderRadius: '24px', backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', padding: '20px', boxSizing: 'border-box', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)' }}>
         
-        {loading || !movie ? (
+        {loading ? (
           <div style={{ textAlign: 'center', padding: '50px 0', color: '#A1A1AA' }}>
             ⏳ Recherche du film parfait...
           </div>
-        ) : (
+        ) : errorMsg ? (
+          <div style={{ textAlign: 'center', padding: '30px 0' }}>
+            <p style={{ color: '#EF4444', fontSize: '14px', marginBottom: '16px' }}>⚠️ Erreur : {errorMsg}</p>
+            <button 
+              onClick={() => fetchRandomMovie()}
+              style={{ backgroundColor: '#9333EA', color: '#FFFFFF', border: 'none', fontSize: '12px', fontWeight: '700', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer' }}
+            >
+              🔄 Réessayer
+            </button>
+          </div>
+        ) : movie && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: '#FBBF24' }}>
