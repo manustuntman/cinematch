@@ -26,13 +26,28 @@ export default function HomePage() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedMovieDetail, setSelectedMovieDetail] = useState<any>(null);
 
-  // Crédits, Plateformes (Payantes et Gratuites) & Bande-annonce
-  const [movieDetailsExt, setMovieDetailsExt] = useState<{ director: string; cast: string[]; providers: any[]; freeProviders: any[]; trailerKey: string | null }>({
+  // Onglet actif dans la fiche (Infos principales VS X-Ray)
+  const [activeTab, setActiveTab] = useState<'info' | 'xray'>('info');
+
+  // Données étendues X-Ray & Détails
+  const [movieDetailsExt, setMovieDetailsExt] = useState<{ 
+    director: string; 
+    castWithRoles: { name: string; character: string; profile_path: string | null }[]; 
+    providers: any[]; 
+    freeProviders: any[]; 
+    trailerKey: string | null;
+    tagline: string;
+    runtime: number;
+    budget: number;
+  }>({
     director: '',
-    cast: [],
+    castWithRoles: [],
     providers: [],
     freeProviders: [],
     trailerKey: null,
+    tagline: '',
+    runtime: 0,
+    budget: 0,
   });
   const [loadingExt, setLoadingExt] = useState(false);
 
@@ -102,23 +117,30 @@ export default function HomePage() {
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       
+      // 1. Infos détaillées (Durée, tagline, budget)
+      const detailRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&language=fr-FR`);
+      const detailData = await detailRes.json();
+
+      // 2. Crédits (Réalisateur & Casting complet avec rôles pour le X-Ray)
       const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${API_KEY}&language=fr-FR`);
       const creditsData = await creditsRes.json();
       
       const directorObj = creditsData.crew?.find((member: any) => member.job === 'Director');
       const directorName = directorObj ? directorObj.name : 'Non renseigné';
-      const topCast = creditsData.cast ? creditsData.cast.slice(0, 4).map((c: any) => c.name) : [];
+      const castWithRoles = creditsData.cast ? creditsData.cast.slice(0, 6).map((c: any) => ({
+        name: c.name,
+        character: c.character,
+        profile_path: c.profile_path
+      })) : [];
 
-      // Plateformes de streaming (Abonnements payants + Gratuits / Replay FR)
+      // 3. Streaming (Free & Flatrate)
       const providersRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/watch/providers?api_key=${API_KEY}`);
       const providersData = await providersRes.json();
       const frProviders = providersData.results?.FR || {};
-      const flatrate = frProviders.flatrate || []; // Netflix, Prime, etc.
-      const free = frProviders.free || [];         // M6+, TF1+, France.tv, etc.
 
+      // 4. Videos / Trailer
       let videoRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=fr-FR`);
       let videoData = await videoRes.json();
-      
       let trailer = videoData.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
       
       if (!trailer) {
@@ -129,20 +151,23 @@ export default function HomePage() {
 
       setMovieDetailsExt({
         director: directorName,
-        cast: topCast,
-        providers: flatrate,
-        freeProviders: free,
+        castWithRoles,
+        providers: frProviders.flatrate || [],
+        freeProviders: frProviders.free || [],
         trailerKey: trailer ? trailer.key : null,
+        tagline: detailData.tagline || '',
+        runtime: detailData.runtime || 0,
+        budget: detailData.budget || 0,
       });
     } catch (err) {
-      console.error("Erreur détails étendus :", err);
-      setMovieDetailsExt({ director: 'N/A', cast: [], providers: [], freeProviders: [], trailerKey: null });
+      console.error(err);
     }
     setLoadingExt(false);
   };
 
   const openMovieModal = (movie: any) => {
     setSelectedMovieDetail(movie);
+    setActiveTab('info');
     setUserNotes('');
     setUserRating(0);
     setSelectedTags([]);
@@ -192,7 +217,7 @@ export default function HomePage() {
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
-        {/* HEADER AVEC BULLE PROFIL */}
+        {/* HEADER */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <h1 style={{ fontSize: '26px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
@@ -222,7 +247,7 @@ export default function HomePage() {
           </a>
         </header>
 
-        {/* NAVIGATION : ACCUEIL PUIS WATCHLIST */}
+        {/* NAVIGATION */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
           {isSetupComplete && (
             <button
@@ -256,7 +281,7 @@ export default function HomePage() {
         {/* CONTENU PRINCIPAL */}
         {!isSetupComplete ? (
           <div>
-            {/* 1. SELECTION DES GENRES */}
+            {/* 1. GENRES */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '24px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Quels sont tes genres préférés ? 🍿</h2>
               <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Sélectionne tes catégories favorites.</p>
@@ -310,7 +335,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* 2. ROULETTE EXPRESS SURPRISE */}
+            {/* 2. ROULETTE */}
             <div style={{ 
               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(236, 72, 153, 0.15))', 
               border: '1px solid rgba(192, 132, 252, 0.4)', 
@@ -370,7 +395,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* 3. TENDANCES ACTUELLES */}
+            {/* 3. TENDANCES */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
                 🔥 Tendances actuelles ({trendingMovies.length})
@@ -412,132 +437,192 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MODALE FICHE FILM UNIFIÉE */}
+        {/* MODALE FICHE FILM AVEC X-RAY ⚡ */}
         {selectedMovieDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
               
               <button onClick={() => setSelectedMovieDetail(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700', zIndex: 10 }}>✕</button>
 
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                <img src={`https://image.tmdb.org/t/p/w500${selectedMovieDetail.poster_path}`} alt={selectedMovieDetail.title} style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
-                <div style={{ flex: 1 }}>
-                  <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 4px 0' }}>{selectedMovieDetail.title}</h2>
-                  <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '8px', display: 'inline-block', marginBottom: '8px' }}>
-                    ★ {selectedMovieDetail.vote_average?.toFixed(1)} / 10 (TMDB)
-                  </span>
-                  
-                  <p style={{ fontSize: '11px', color: '#A1A1AA', margin: '0 0 4px 0' }}>
-                    <strong style={{ color: '#FFF' }}>Réalisateur :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.director || 'N/A'}
-                  </p>
-
-                  <p style={{ fontSize: '11px', color: '#A1A1AA', margin: 0 }}>
-                    <strong style={{ color: '#FFF' }}>Casting :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.cast.length > 0 ? movieDetailsExt.cast.join(', ') : 'N/A'}
-                  </p>
-                </div>
+              {/* BARRE D'ONGLETS : INFOS VS X-RAY */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '10px' }}>
+                <button
+                  onClick={() => setActiveTab('info')}
+                  style={{
+                    backgroundColor: activeTab === 'info' ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
+                    color: '#FFF',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🎬 Fiche Film
+                </button>
+                <button
+                  onClick={() => setActiveTab('xray')}
+                  style={{
+                    backgroundColor: activeTab === 'xray' ? '#FBBF24' : 'rgba(255, 255, 255, 0.05)',
+                    color: activeTab === 'xray' ? '#000' : '#FFF',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  ⚡ X-Ray
+                </button>
               </div>
 
-              <p style={{ fontSize: '12px', color: '#D4D4D8', lineHeight: '1.5', margin: '0 0 16px 0' }}>
-                {selectedMovieDetail.overview}
-              </p>
+              {/* ONGLET 1 : INFOS HABITUELLES */}
+              {activeTab === 'info' && (
+                <div>
+                  <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                    <img src={`https://image.tmdb.org/t/p/w500${selectedMovieDetail.poster_path}`} alt={selectedMovieDetail.title} style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
+                    <div style={{ flex: 1 }}>
+                      <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 4px 0' }}>{selectedMovieDetail.title}</h2>
+                      <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '8px', display: 'inline-block', marginBottom: '8px' }}>
+                        ★ {selectedMovieDetail.vote_average?.toFixed(1)} / 10 (TMDB)
+                      </span>
+                      
+                      <p style={{ fontSize: '11px', color: '#A1A1AA', margin: '0 0 4px 0' }}>
+                        <strong style={{ color: '#FFF' }}>Réalisateur :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.director || 'N/A'}
+                      </p>
 
-              {/* STREAMING GRATUIT (REPLAY / M6+) & ABONNEMENTS OU CINÉMA */}
-              <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
-                  📺 Où le regarder :
-                </span>
-                {loadingExt ? (
-                  <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Recherche des disponibilités...</span>
-                ) : (
-                  <div>
-                    {/* 1. PLATEFORMES GRATUITES / REPLAY (M6+, etc.) */}
-                    {movieDetailsExt.freeProviders.length > 0 && (
-                      <div style={{ marginBottom: '8px' }}>
-                        <span style={{ fontSize: '10px', color: '#4ADE80', fontWeight: '700', display: 'block', marginBottom: '4px' }}>🎁 Gratuit / Replay :</span>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                          {movieDetailsExt.freeProviders.map((provider: any) => (
-                            <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.2)', padding: '4px 8px', borderRadius: '8px' }}>
-                              <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
-                              <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                      {movieDetailsExt.runtime > 0 && (
+                        <p style={{ fontSize: '11px', color: '#A1A1AA', margin: 0 }}>
+                          <strong style={{ color: '#FFF' }}>Durée :</strong> {Math.floor(movieDetailsExt.runtime / 60)}h {movieDetailsExt.runtime % 60}m
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-                    {/* 2. ABONNEMENTS PAYANTS (Netflix, Prime...) */}
-                    {movieDetailsExt.providers.length > 0 && (
-                      <div style={{ marginBottom: movieDetailsExt.freeProviders.length > 0 ? '8px' : '0' }}>
-                        <span style={{ fontSize: '10px', color: '#C084FC', fontWeight: '700', display: 'block', marginBottom: '4px' }}>✨ Abonnement :</span>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                          {movieDetailsExt.providers.map((provider: any) => (
-                            <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px 8px', borderRadius: '8px' }}>
-                              <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
-                              <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                  <p style={{ fontSize: '12px', color: '#D4D4D8', lineHeight: '1.5', margin: '0 0 16px 0' }}>
+                    {selectedMovieDetail.overview}
+                  </p>
 
-                    {/* 3. SI RIEN N'EST DISPO -> CINÉMA */}
-                    {movieDetailsExt.freeProviders.length === 0 && movieDetailsExt.providers.length === 0 && (
+                  {/* STREAMING */}
+                  <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
+                      📺 Où le regarder :
+                    </span>
+                    {loadingExt ? (
+                      <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Recherche des disponibilités...</span>
+                    ) : (
                       <div>
-                        <span style={{ fontSize: '11px', color: '#FBBF24', fontWeight: '700', display: 'block', marginBottom: '8px' }}>
-                          🍿 Actuellement au cinéma !
-                        </span>
-                        <a
-                          href={`https://www.google.com/search?q=seance+cinema+${encodeURIComponent(selectedMovieDetail.title)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            backgroundColor: '#9333EA',
-                            color: '#FFF',
-                            textDecoration: 'none',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            padding: '8px 12px',
-                            borderRadius: '10px'
-                          }}
-                        >
-                          📍 Voir les séances près de chez moi →
-                        </a>
+                        {movieDetailsExt.freeProviders.length > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <span style={{ fontSize: '10px', color: '#4ADE80', fontWeight: '700', display: 'block', marginBottom: '4px' }}>🎁 Gratuit / Replay :</span>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {movieDetailsExt.freeProviders.map((provider: any) => (
+                                <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.2)', padding: '4px 8px', borderRadius: '8px' }}>
+                                  <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+                                  <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {movieDetailsExt.providers.length > 0 && (
+                          <div>
+                            <span style={{ fontSize: '10px', color: '#C084FC', fontWeight: '700', display: 'block', marginBottom: '4px' }}>✨ Abonnement :</span>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {movieDetailsExt.providers.map((provider: any) => (
+                                <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px 8px', borderRadius: '8px' }}>
+                                  <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+                                  <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {movieDetailsExt.freeProviders.length === 0 && movieDetailsExt.providers.length === 0 && (
+                          <div>
+                            <span style={{ fontSize: '11px', color: '#FBBF24', fontWeight: '700', display: 'block', marginBottom: '8px' }}>🍿 Actuellement au cinéma !</span>
+                            <a href={`https://www.google.com/search?q=seance+cinema+${encodeURIComponent(selectedMovieDetail.title)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#9333EA', color: '#FFF', textDecoration: 'none', fontSize: '11px', fontWeight: '700', padding: '8px 12px', borderRadius: '10px' }}>
+                              📍 Voir les séances près de chez moi →
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              {/* TRAILER YOUTUBE */}
-              <div style={{ marginBottom: '20px' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
-                  🎬 Bande-annonce officielle :
-                </span>
-                {loadingExt ? (
-                  <div style={{ height: '180px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A1A1AA', fontSize: '12px' }}>
-                    Chargement du trailer...
+                  {/* TRAILER YOUTUBE */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>🎬 Bande-annonce :</span>
+                    {movieDetailsExt.trailerKey ? (
+                      <div style={{ position: 'relative', width: '100%', height: '200px', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                        <iframe src={`https://www.youtube.com/embed/${movieDetailsExt.trailerKey}`} title="Trailer" style={{ width: '100%', height: '100%', border: 'none' }} allowFullScreen />
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Aucune vidéo disponible.</span>
+                    )}
                   </div>
-                ) : movieDetailsExt.trailerKey ? (
-                  <div style={{ position: 'relative', width: '100%', height: '200px', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <iframe
-                      src={`https://www.youtube.com/embed/${movieDetailsExt.trailerKey}`}
-                      title="Bande-annonce"
-                      style={{ width: '100%', height: '100%', border: 'none' }}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                ) : (
-                  <div style={{ padding: '12px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.03)', color: '#A1A1AA', fontSize: '11px', textAlign: 'center' }}>
-                    Aucune bande-annonce vidéo disponible.
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* CARNET DE BORD */}
+              {/* ONGLET 2 : PANNEAU X-RAY ⚡ */}
+              {activeTab === 'xray' && (
+                <div>
+                  <div style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '16px', padding: '12px', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                      ⚡ Mode X-Ray Actif
+                    </span>
+                    <h3 style={{ fontSize: '15px', fontWeight: '800', margin: '4px 0 2px 0' }}>{selectedMovieDetail.title}</h3>
+                    {movieDetailsExt.tagline && <p style={{ fontSize: '11px', color: '#A1A1AA', italic: 'true', margin: 0 }}>« {movieDetailsExt.tagline} »</p>}
+                  </div>
+
+                  {/* CASTING DÉTAILLÉ AVEC RÔLES (X-RAY CAST) */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <h4 style={{ fontSize: '12px', color: '#C084FC', fontWeight: '700', margin: '0 0 10px 0', textTransform: 'uppercase' }}>
+                      🎭 Acteurs & Personnages
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      {movieDetailsExt.castWithRoles.map((actor, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '6px', borderRadius: '10px' }}>
+                          {actor.profile_path ? (
+                            <img src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} alt={actor.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#3F3F46', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>👤</div>
+                          )}
+                          <div style={{ overflow: 'hidden' }}>
+                            <span style={{ fontSize: '11px', fontWeight: '700', color: '#FFF', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actor.name}</span>
+                            <span style={{ fontSize: '10px', color: '#A1A1AA', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actor.character || 'Rôle inconnu'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* BANDE ORIGINALE & MUSIQUE (X-RAY MUSIC) */}
+                  <div style={{ marginBottom: '16px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '12px', borderRadius: '12px' }}>
+                    <h4 style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '700', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🎵 Bande Originale & Musiques
+                    </h4>
+                    <p style={{ fontSize: '11px', color: '#D4D4D8', margin: '0 0 8px 0' }}>Écoute la B.O. complète du film sur Spotify ou YouTube :</p>
+                    <a
+                      href={`https://open.spotify.com/search/${encodeURIComponent(selectedMovieDetail.title + ' soundtrack')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#1DB954', color: '#000', textDecoration: 'none', fontSize: '11px', fontWeight: '800', padding: '6px 12px', borderRadius: '8px' }}
+                    >
+                      🎧 Écouter la B.O. sur Spotify →
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* CARNET DE BORD (TOUJOURS ACCESSIBLE) */}
               <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   📓 Mon Carnet de Bord
@@ -585,7 +670,7 @@ export default function HomePage() {
                 </div>
 
                 <div style={{ marginBottom: '20px' }}>
-                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Mes remarques & répliques marquantes :</label>
+                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Mes remarques :</label>
                   <textarea
                     value={userNotes}
                     onChange={(e) => setUserNotes(e.target.value)}
