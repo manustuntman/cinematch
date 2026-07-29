@@ -24,9 +24,9 @@ export async function POST(req: Request) {
     2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
     [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
 
-    // Utilisation de l'alias officiel 'gemini-flash'
+    // Modèle officiel pour l'API REST Gemini
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
