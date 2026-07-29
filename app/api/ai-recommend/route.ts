@@ -4,6 +4,12 @@ export async function POST(req: Request) {
   try {
     const { prompt, mediaType } = await req.json();
 
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY manquante dans les variables d environnemnt Vercel');
+      return NextResponse.json({ error: 'Clé API non configurée' }, { status: 500 });
+    }
+
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt requis' }, { status: 400 });
     }
@@ -13,13 +19,13 @@ export async function POST(req: Request) {
     const systemPrompt = `Tu es un expert cinéma et recommandeur ultra-pointu.
     Propose exactement 5 ${typeLabel} qui correspondent au CONCEPT et à l'AMBIANCE de cette demande : "${prompt}".
     Règles :
-    1. Ne cherche pas juste les mots dans le titre, trouve de véritables œuvres qui traitent du thème (ex: voyage dans le temps = Predestination, Looper, L'Effet Papillon, etc.).
-    2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour :
+    1. Ne cherche pas juste les mots dans le titre, trouve de véritables œuvres qui traitent du thème (ex: voyage dans le temps = Predestination, Looper, L'Effet Papillon, Interstellar, etc.).
+    2. Réponds STRICTEMENT sous la forme d'un tableau JSON d'objets sans aucun texte autour, ni balises markdown :
     [{"title": "Titre exact en français", "reason": "Explication courte"}]`;
 
-    // Appel direct à l'API Gemini de Google
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    // Essai avec gemini-2.5-flash, puis fallback sur gemini-2.0-flash si besoin
+    let geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,9 +35,24 @@ export async function POST(req: Request) {
       }
     );
 
+    if (!geminiRes.ok) {
+      geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt }] }]
+          })
+        }
+      );
+    }
+
     const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-    const cleanJsonText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    // Nettoyage des balises Markdown ```json
+    const cleanJsonText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
     const recommendations = JSON.parse(cleanJsonText);
 
     return NextResponse.json({ recommendations });
