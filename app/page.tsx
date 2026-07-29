@@ -740,7 +740,7 @@ export default function HomePage() {
                   <div style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '16px', padding: '12px', marginBottom: '16px' }}>
                     <span style={{ fontSize: '10px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase', letterSpacing: '1px' }}>⚡ Mode X-Ray Actif</span>
                     <h3 style={{ fontSize: '15px', fontWeight: '800', margin: '4px 0 2px 0' }}>{selectedMediaDetail.title || selectedMediaDetail.name}</h3>
-                    {mediaDetailsExt.tagline && <p style={{ fontSize: '11px', color: '#A1A1AA', italic: 'true', margin: 0 }}>« {mediaDetailsExt.tagline} »</p>}
+                    {mediaDetailsExt.tagline && <p style={{ fontSize: '11px', color: '#A1A1AA', fontStyle: 'italic', margin: 0 }}>« {mediaDetailsExt.tagline} »</p>}
                   </div>
 
                   <div style={{ marginBottom: '16px' }}>
