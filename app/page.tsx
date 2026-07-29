@@ -18,15 +18,31 @@ export default function HomePage() {
   const [preferences, setPreferences] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
+  const [nowPlayingMovies, setNowPlayingMovies] = useState<any[]>([]); // ~20 films à l'affiche
   const [recommendedMovies, setRecommendedMovies] = useState<any[]>([]);
   const [rouletteMovie, setRouletteMovie] = useState<any>(null);
-  const [selectedMovieDetail, setSelectedMovieDetail] = useState<any>(null); // Film actuellement ouvert en grand
+  const [selectedMovieDetail, setSelectedMovieDetail] = useState<any>(null); // Modale
 
   const [mode, setMode] = useState<'recommendations' | 'roulette'>('recommendations');
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // Charger les recommandations
+  // Charger les 20 films actuellement au cinéma
+  const fetchNowPlaying = async () => {
+    try {
+      const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
+      const url = `https://api.themoviedb.org/3/movie/now_playing?api_key=${API_KEY}&language=fr-FR&page=1&region=FR`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.results) {
+        setNowPlayingMovies(data.results.slice(0, 20)); // Récupère 20 films
+      }
+    } catch (err) {
+      console.error("Erreur Now Playing :", err);
+    }
+  };
+
+  // Charger les recommandations selon les genres choisis
   const fetchRecommendations = async (selectedGenres: number[]) => {
     setLoading(true);
     try {
@@ -38,7 +54,7 @@ export default function HomePage() {
       const data = await res.json();
 
       if (data.results) {
-        setRecommendedMovies(data.results.slice(0, 10));
+        setRecommendedMovies(data.results.slice(0, 20));
       }
     } catch (err) {
       console.error(err);
@@ -108,12 +124,16 @@ export default function HomePage() {
     setTimeout(() => setFeedback(null), 3000);
   };
 
+  useEffect(() => {
+    fetchNowPlaying();
+  }, []);
+
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <div style={{ maxWidth: '650px', margin: '0 auto' }}>
         
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
             CineMatch 🎬
           </h1>
@@ -132,53 +152,84 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ÉTAPE 1 : QUESTIONNAIRE GOÛTS */}
+        {/* ÉTAPE 1 : QUESTIONNAIRE GOÛTS + 20 FILMS À L'AFFICHE EN DESSOUS */}
         {!isSetupComplete ? (
-          <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Quels sont tes genres préférés ? 🍿</h2>
-            <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Sélectionne tes catégories favorites.</p>
-            
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
-              {GENRES_LIST.map((g) => {
-                const selected = preferences.includes(g.id);
-                return (
-                  <button
-                    key={g.id}
-                    onClick={() => toggleGenre(g.id)}
-                    style={{
-                      backgroundColor: selected ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
-                      border: selected ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
-                      color: '#FFFFFF',
-                      padding: '8px 14px',
-                      borderRadius: '16px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {g.name}
-                  </button>
-                );
-              })}
+          <div>
+            {/* Panneau de sélection des genres */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '32px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Quels sont tes genres préférés ? 🍿</h2>
+              <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Sélectionne tes catégories favorites pour personnaliser tes recommandations.</p>
+              
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
+                {GENRES_LIST.map((g) => {
+                  const selected = preferences.includes(g.id);
+                  return (
+                    <button
+                      key={g.id}
+                      onClick={() => toggleGenre(g.id)}
+                      style={{
+                        backgroundColor: selected ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
+                        border: selected ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
+                        color: '#FFFFFF',
+                        padding: '8px 14px',
+                        borderRadius: '16px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {g.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                disabled={preferences.length === 0}
+                onClick={handleSavePreferences}
+                style={{
+                  width: '100%',
+                  backgroundColor: preferences.length > 0 ? '#9333EA' : 'rgba(255, 255, 255, 0.1)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  padding: '12px',
+                  borderRadius: '14px',
+                  fontWeight: '700',
+                  fontSize: '14px',
+                  cursor: preferences.length > 0 ? 'pointer' : 'not-allowed'
+                }}
+              >
+                Découvrir mes recommandations ✨
+              </button>
             </div>
 
-            <button
-              disabled={preferences.length === 0}
-              onClick={handleSavePreferences}
-              style={{
-                width: '100%',
-                backgroundColor: preferences.length > 0 ? '#9333EA' : 'rgba(255, 255, 255, 0.1)',
-                color: '#FFFFFF',
-                border: 'none',
-                padding: '12px',
-                borderRadius: '14px',
-                fontWeight: '700',
-                fontSize: '14px',
-                cursor: preferences.length > 0 ? 'pointer' : 'not-allowed'
-              }}
-            >
-              Découvrir mes recommandations ✨
-            </button>
+            {/* Grille des ~20 films actuellement à l'affiche */}
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                🔥 À l'affiche au cinéma ({nowPlayingMovies.length})
+              </h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
+                {nowPlayingMovies.map((item) => (
+                  <div 
+                    key={item.id} 
+                    onClick={() => setSelectedMovieDetail(item)}
+                    style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
+                  >
+                    <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
+                    <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+                      <div>
+                        <h3 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
+                        <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {item.vote_average?.toFixed(1)}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+                        <button onClick={(e) => { e.stopPropagation(); saveToSupabase(item, 'watched'); }} style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', fontSize: '10px', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}>👁️</button>
+                        <button onClick={(e) => { e.stopPropagation(); saveToSupabase(item, 'to_watch'); }} style={{ flex: 1, backgroundColor: '#9333EA', color: '#FFF', border: 'none', fontSize: '10px', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}>📌</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           /* ÉTAPE 2 : ACCUEIL PERSONNALISÉ */
@@ -212,17 +263,17 @@ export default function HomePage() {
                 {loading ? (
                   <p style={{ textAlign: 'center', color: '#A1A1AA', padding: '40px 0' }}>Analyse des meilleurs films pour toi...</p>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px' }}>
                     {recommendedMovies.map((item) => (
                       <div 
                         key={item.id} 
                         onClick={() => setSelectedMovieDetail(item)}
-                        style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'transform 0.2s' }}
+                        style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
                       >
-                        <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title} style={{ width: '100%', height: '190px', objectFit: 'cover' }} />
+                        <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
                         <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
                           <div>
-                            <h3 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
+                            <h3 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
                             <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {item.vote_average?.toFixed(1)}</span>
                           </div>
                           <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
@@ -261,12 +312,11 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MODALE DETAILED FICHE FILM */}
+        {/* MODALE FICHE FILM */}
         {selectedMovieDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 999 }}>
             <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '420px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
               
-              {/* Bouton Fermer */}
               <button 
                 onClick={() => setSelectedMovieDetail(null)}
                 style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700' }}
