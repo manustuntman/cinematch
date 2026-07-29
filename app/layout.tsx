@@ -1,8 +1,15 @@
-import './globals.css';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'CineMatch',
-  description: 'Recommandations de films et séries',
+export const metadata: Metadata = {
+  title: 'CineMatch 🎬 - Films & Séries Sur-Mesure',
+  description: 'Trouve instantanément ton prochain film ou ta prochaine série sans perdre de temps.',
+  manifest: '/manifest.json',
+  themeColor: '#9333EA',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'CineMatch',
+  },
 };
 
 export default function RootLayout({
@@ -12,7 +19,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr">
-      <body className="bg-black text-white">{children}</body>
+      <body style={{ margin: 0, backgroundColor: '#0A0A0A', color: '#FFFFFF' }}>
+        {children}
+      </body>
     </html>
   );
 }
