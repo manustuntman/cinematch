@@ -190,20 +190,46 @@ export default function HomePage() {
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <div style={{ maxWidth: '650px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
-            CineMatch 🎬
-          </h1>
-          <p style={{ fontSize: '13px', color: '#A1A1AA', marginTop: '4px' }}>Ton assistant cinéma sur-mesure</p>
-        </div>
+        {/* HEADER AVEC BULLE PROFIL EN HAUT À DROITE */}
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h1 style={{ fontSize: '28px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+              CineMatch 🎬
+            </h1>
+            <p style={{ fontSize: '12px', color: '#A1A1AA', margin: '2px 0 0 0' }}>Assistant Cinéma & Carnet de Bord</p>
+          </div>
 
-        {/* Navigation Rapide */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '24px' }}>
-          <a href="/watchlist" style={{ color: '#C084FC', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(192, 132, 252, 0.1)', padding: '6px 14px', borderRadius: '20px' }}>📌 Ma Watchlist</a>
-          <a href="/profile" style={{ color: '#FBBF24', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(251, 191, 36, 0.1)', padding: '6px 14px', borderRadius: '20px' }}>👤 Mon Profil & XP</a>
+          {/* BULLE PROFIL / CONNEXION */}
+          <a 
+            href="/profile" 
+            title="Mon Profil & Espace Membre"
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              backgroundColor: 'rgba(24, 24, 27, 0.8)', 
+              border: '1px solid rgba(255, 255, 255, 0.15)', 
+              padding: '6px 12px 6px 6px', 
+              borderRadius: '30px', 
+              textDecoration: 'none',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+              transition: 'all 0.2s'
+            }}
+          >
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold' }}>
+              👤
+            </div>
+            <span style={{ fontSize: '12px', color: '#FFF', fontWeight: '600' }}>Profil / XP</span>
+          </a>
+        </header>
+
+        {/* NAVIGATION SECONDAIRE */}
+        <div style={{ display: 'flex', justifyContent: 'flex-start', gap: '8px', marginBottom: '24px' }}>
+          <a href="/watchlist" style={{ color: '#C084FC', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(192, 132, 252, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(192, 132, 252, 0.2)' }}>
+            📌 Ma Watchlist
+          </a>
         </div>
 
         {feedback && (
