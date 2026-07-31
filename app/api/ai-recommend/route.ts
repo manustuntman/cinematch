@@ -26,15 +26,18 @@ export async function POST(req: Request) {
         messages: [
           {
             role: 'system',
-            content: `Tu es un expert absolu en cinéma, répliques cultes et dialogues de films. 
-            Analyse la demande de l'utilisateur : "${prompt}".
-            - Si cette phrase contient une réplique, une citation, un extrait de dialogue ou fait référence à une scène précise, le film ou la série correspondant DOIT IMPÉRATIVEMENT être le PREMIER élément de ton tableau.
-            - Complète ensuite avec 4 autres ${typeLabel} dans le même esprit ou du même réalisateur.
-            - Renvoie STRICTEMENT un tableau JSON valide sous cette forme exacte, sans texte autour, sans markdown :
-            [{"title": "Titre exact et officiel du film", "reason": "Pourquoi cette réplique correspond"}]`
+            content: `Tu es un expert mondial et infaillible en cinéma, répliques cultes et citations exactes. 
+            Analyse précisément la demande de l'utilisateur : "${prompt}".
+            
+            INSTRUCTIONS CRITIQUES :
+            1. Si la phrase contient une réplique ou une citation, identifie le film exact où elle est prononcée. N'invente jamais et ne te trompe pas de film (par exemple, "Il s'appelle Juste Leblanc" vient obligatoirement du film "Le Dîner de cons").
+            2. Ce film exact DOIT IMPÉRATIVEMENT être le PREMIER élément de ton tableau.
+            3. Complète ensuite avec 4 autres ${typeLabel} du même réalisateur, du même genre ou avec les mêmes acteurs.
+            4. Renvoie STRICTEMENT un tableau JSON valide sous cette forme exacte, sans texte autour, sans markdown :
+            [{"title": "Titre exact et officiel du film", "reason": "Explication précise"}]`
           }
         ],
-        temperature: 0.2
+        temperature: 0.1
       })
     });
 
@@ -64,7 +67,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ recommendations });
 
-} catch (err: any) {
+  } catch (err: any) {
     console.error('Erreur serveur:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
