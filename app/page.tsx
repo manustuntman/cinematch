@@ -497,9 +497,9 @@ export default function HomePage() {
         
         {/* HEADER */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div>
+         <div>
             <img 
-              src="logo.png" 
+              src="https://raw.githubusercontent.com/manustuntman/potecorn/main/public/logo.png" 
               alt="Logo PoteCorn" 
               style={{ height: '45px', width: 'auto', objectFit: 'contain' }}
             />
