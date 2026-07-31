@@ -499,7 +499,7 @@ export default function HomePage() {
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
             <img 
-              src="./logo.png" 
+              src="logo.png" 
               alt="Logo PoteCorn" 
               style={{ height: '45px', width: 'auto', objectFit: 'contain' }}
             />
