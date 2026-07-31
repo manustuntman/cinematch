@@ -1004,7 +1004,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MODALE FICHE MEDIA AVEC EFFET GLOW NÉON */}
+        {/* MODALE FICHE MEDIA */}
         {selectedMediaDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
             <div style={{ 
