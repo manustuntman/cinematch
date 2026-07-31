@@ -26,16 +26,15 @@ export async function POST(req: Request) {
         messages: [
           {
             role: 'system',
-            content: `Tu es un expert cinéma et recommandeur ultra-pointu. 
-            L'utilisateur peut te donner soit une description d'une envie, soit une réplique, une citation culte ou un extrait de dialogue dont il recherche le titre.
-            - Si l'utilisateur tape une réplique ou citation, identifie en premier le film ou la série correspondant, mets-le en premier dans ta liste, et propose 4 autres ${typeLabel} similaires ou de la même ambiance.
-            - Trouve exactement 5 ${typeLabel} au total pour le concept ou la réplique : "${prompt}".
-            
-            RÈGLE ABSOLUE : Renvoie STRICTEMENT un tableau JSON valide sous cette forme exacte, sans texte autour, sans markdown :
-            [{"title": "Titre exact", "reason": "Explication courte"}]`
+            content: `Tu es un expert absolu en cinéma, répliques cultes et dialogues de films. 
+            Analyse la demande de l'utilisateur : "${prompt}".
+            - Si cette phrase contient une réplique, une citation, un extrait de dialogue ou fait référence à une scène précise, le film ou la série correspondant DOIT IMPÉRATIVEMENT être le PREMIER élément de ton tableau.
+            - Complète ensuite avec 4 autres ${typeLabel} dans le même esprit ou du même réalisateur.
+            - Renvoie STRICTEMENT un tableau JSON valide sous cette forme exacte, sans texte autour, sans markdown :
+            [{"title": "Titre exact et officiel du film", "reason": "Pourquoi cette réplique correspond"}]`
           }
         ],
-        temperature: 0.3
+        temperature: 0.2
       })
     });
 
@@ -47,7 +46,6 @@ export async function POST(req: Request) {
 
     const rawText = data.choices[0]?.message?.content || '[]';
     
-    // Nettoyage agressif pour isoler uniquement le tableau JSON
     let clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
     const firstBracket = clean.indexOf('[');
     const lastBracket = clean.lastIndexOf(']');
@@ -61,13 +59,12 @@ export async function POST(req: Request) {
       recommendations = JSON.parse(clean);
     } catch (parseError) {
       console.error('Erreur de parsing JSON brut:', clean);
-      // Secours ultime : si le JSON est cassé, on renvoie un tableau vide propre pour éviter le crash
       recommendations = [];
     }
 
     return NextResponse.json({ recommendations });
 
-  } catch (err: any) {
+} catch (err: any) {
     console.error('Erreur serveur:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
