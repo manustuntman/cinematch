@@ -63,9 +63,9 @@ export default function PoteCornPartyPage() {
     const currentMovie = swipeQueue[currentIndex];
     if (currentMovie) {
       if (direction === 'right') {
-        console.log(`[PoteCorn Party] Utilisateur ${userId} a AIMÉ :`, currentMovie.title);
+        console.log(`[PoteCorn Party] Utilisateur ${userId} a VALIDÉ :`, currentMovie.title);
       } else {
-        console.log(`[PoteCorn Party] Utilisateur ${userId} a REJETÉ :`, currentMovie.title);
+        console.log(`[PoteCorn Party] Utilisateur ${userId} a mis un RED FLAG :`, currentMovie.title);
       }
     }
 
@@ -98,13 +98,11 @@ export default function PoteCornPartyPage() {
     if (!isDragging) return;
     setIsDragging(false);
 
-    // Seuil de validation (si on glisse de plus de 100px)
-    if (touchDeltaX > 100) {
+    if (touchDeltaX > 90) {
       handleSwipe('right');
-    } else if (touchDeltaX < -100) {
+    } else if (touchDeltaX < -90) {
       handleSwipe('left');
     } else {
-      // Retour à la position initiale en douceur
       setTouchDeltaX(0);
     }
   };
@@ -207,7 +205,7 @@ export default function PoteCornPartyPage() {
                 ← Quitter
               </button>
               <span style={{ fontSize: '11px', color: '#A1A1AA', fontWeight: '600' }}>
-                Glisse ou utilise les boutons 👇
+                Glisse à gauche (Red Flag) ou à droite (Je valide) 👆
               </span>
             </div>
 
@@ -246,6 +244,52 @@ export default function PoteCornPartyPage() {
                     transition: isDragging ? 'none' : 'transform 0.2s ease'
                   }}
                 >
+                  {/* TAMPON VISUEL "JE VALIDE" (DROITE) */}
+                  {touchDeltaX > 20 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '30px',
+                      left: '20px',
+                      zIndex: 20,
+                      border: '4px solid #4ADE80',
+                      color: '#4ADE80',
+                      padding: '8px 16px',
+                      borderRadius: '12px',
+                      fontSize: '20px',
+                      fontWeight: '900',
+                      textTransform: 'uppercase',
+                      transform: 'rotate(-15deg)',
+                      backgroundColor: 'rgba(0,0,0,0.7)',
+                      pointerEvents: 'none',
+                      opacity: Math.min(touchDeltaX / 80, 1)
+                    }}>
+                      ✨ JE VALIDE
+                    </div>
+                  )}
+
+                  {/* TAMPON VISUEL "RED FLAG" (GAUCHE) */}
+                  {touchDeltaX < -20 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '30px',
+                      right: '20px',
+                      zIndex: 20,
+                      border: '4px solid #EF4444',
+                      color: '#EF4444',
+                      padding: '8px 16px',
+                      borderRadius: '12px',
+                      fontSize: '20px',
+                      fontWeight: '900',
+                      textTransform: 'uppercase',
+                      transform: 'rotate(15deg)',
+                      backgroundColor: 'rgba(0,0,0,0.7)',
+                      pointerEvents: 'none',
+                      opacity: Math.min(Math.abs(touchDeltaX) / 80, 1)
+                    }}>
+                      ❌ RED FLAG
+                    </div>
+                  )}
+
                   <div style={{ position: 'relative', height: '440px', pointerEvents: 'none' }}>
                     <img 
                       src={currentMovie.poster_path ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` : 'https://via.placeholder.com/340x440'} 
@@ -284,16 +328,17 @@ export default function PoteCornPartyPage() {
                     width: '70px', 
                     height: '70px', 
                     borderRadius: '50%', 
-                    backgroundColor: 'rgba(255,255,255,0.05)', 
-                    border: '2px solid rgba(255,255,255,0.15)', 
-                    color: '#FFF', 
-                    fontSize: '28px',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)', 
+                    border: '2px solid #EF4444', 
+                    color: '#EF4444', 
+                    fontSize: '26px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 10px 20px rgba(0,0,0,0.3)'
+                    boxShadow: '0 10px 20px rgba(239, 68, 68, 0.2)'
                   }}
+                  title="Red Flag"
                 >
                   ❌
                 </button>
@@ -304,18 +349,19 @@ export default function PoteCornPartyPage() {
                     width: '70px', 
                     height: '70px', 
                     borderRadius: '50%', 
-                    backgroundColor: 'rgba(236, 72, 153, 0.1)', 
-                    border: '2px solid #EC4899', 
-                    color: '#EC4899', 
+                    backgroundColor: 'rgba(74, 222, 128, 0.1)', 
+                    border: '2px solid #4ADE80', 
+                    color: '#4ADE80', 
                     fontSize: '28px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 10px 25px rgba(236, 72, 153, 0.3)'
+                    boxShadow: '0 10px 25px rgba(74, 222, 128, 0.2)'
                   }}
+                  title="Je valide"
                 >
-                  ❤️
+                  ✨
                 </button>
 
               </div>
