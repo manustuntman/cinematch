@@ -643,23 +643,28 @@ export default function HomePage() {
             marginBottom: '24px',
             boxShadow: '0 10px 25px -5px rgba(147, 51, 234, 0.25)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '18px' }}>🤖</span>
-              <h3 style={{ fontSize: '15px', fontWeight: '800', margin: 0, color: '#FFF' }}>
-                Assistant IA : Dis-moi exactement ce que tu cherches
-              </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+              <img 
+                src="/icon-512.png" 
+                alt="PoteCorn Mascotte" 
+                style={{ height: '40px', width: '40px', borderRadius: '10px', objectFit: 'cover' }}
+              />
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: '800', margin: 0, color: '#FFF' }}>
+                  Une réplique sur le bout de la langue ? 🎬
+                </h3>
+                <p style={{ fontSize: '10px', color: '#C084FC', margin: 0, fontWeight: '600' }}>
+                  Balance une citation ou décris une scène, PoteCorn trouve le film !
+                </p>
+              </div>
             </div>
             
-            <p style={{ fontSize: '11px', color: '#D4D4D8', margin: '0 0 12px 0' }}>
-              Décris ton envie ou tape une phrase culte (ex: <i>"Il s'appelle Juste Leblanc"</i>).
-            </p>
-
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
               <input
                 type="text"
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Ex: réplique culte, voyage dans le temps..."
+                placeholder="Ex: 'Il s'appelle Juste Leblanc' ou voyage dans le temps..."
                 onKeyDown={(e) => e.key === 'Enter' && handleAiSearch()}
                 style={{
                   flex: 1,
@@ -687,7 +692,7 @@ export default function HomePage() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                {aiLoading ? '🤖 Recherche IA...' : '✨ Demander'}
+                {aiLoading ? '🤖 Recherche...' : '✨ Trouver'}
               </button>
             </div>
 
