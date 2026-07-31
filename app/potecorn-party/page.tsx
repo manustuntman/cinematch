@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function PoteCornPartyPage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -55,17 +56,28 @@ export default function PoteCornPartyPage() {
     }
   }, [mode]);
 
-  const handleSwipe = (direction: 'left' | 'right') => {
+  const handleSwipe = async (direction: 'left' | 'right') => {
     if (animatingDir) return;
     setAnimatingDir(direction);
     setIsDragging(false);
 
     const currentMovie = swipeQueue[currentIndex];
-    if (currentMovie) {
-      if (direction === 'right') {
-        console.log(`[PoteCorn Party] Utilisateur ${userId} a VALIDÉ :`, currentMovie.title);
-      } else {
-        console.log(`[PoteCorn Party] Utilisateur ${userId} a mis un RED FLAG :`, currentMovie.title);
+    if (currentMovie && userId) {
+      const actionType = direction === 'right' ? 'liked' : 'disliked';
+      
+      try {
+        await supabase.from('user_swipes').insert([
+          {
+            user_uid: userId,
+            movie_id: currentMovie.id.toString(),
+            title: currentMovie.title,
+            poster_path: currentMovie.poster_path ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` : null,
+            action: actionType
+          }
+        ]);
+        console.log(`[Supabase] Swipe ${actionType} enregistré pour ${currentMovie.title}`);
+      } catch (err) {
+        console.error('Erreur sauvegarde swipe Supabase:', err);
       }
     }
 
