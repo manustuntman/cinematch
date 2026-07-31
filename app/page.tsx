@@ -114,7 +114,7 @@ export default function HomePage() {
   const [selectedAversions, setSelectedAversions] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
-  const [searchQuery, setSearchQuery] = useState('');                  
+  const [searchQuery, setSearchQuery] = useState('');                 
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
   const [trendingMedia, setTrendingMedia] = useState<any[]>([]);
@@ -475,7 +475,7 @@ export default function HomePage() {
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <main style={{ minHeight: '100vh', backgroundColor: '#000000', color: '#FFFFFF', padding: '0 16px 24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       
       {/* ANIMATION CSS POUR LE CAROUSEL FLUIDE */}
       <style jsx global>{`
@@ -496,10 +496,10 @@ export default function HomePage() {
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
         {/* HEADER */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', marginBottom: '16px' }}>
         <div>
             <img 
-              src="https://raw.githubusercontent.com/manustuntman/potecorn/refs/heads/main/app/public/logo.png" 
+              src="https://i.postimg.cc/DyWLbsDz/logo.png" 
               alt="Logo PoteCorn" 
               style={{ height: '45px', width: 'auto', objectFit: 'contain' }}
             />
