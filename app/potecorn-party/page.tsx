@@ -7,7 +7,6 @@ export default function PoteCornPartyPage() {
   const [mode, setMode] = useState<'menu' | 'solo' | 'duo'>('menu');
   const [userId, setUserId] = useState<string>('');
 
-  // States pour le Swipe (Mode Solo)
   const [swipeQueue, setSwipeQueue] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loadingMovies, setLoadingMovies] = useState(false);
@@ -15,30 +14,26 @@ export default function PoteCornPartyPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    
-    // Génération ou récupération de l'ID utilisateur
     let storedId = localStorage.getItem('potecorn_uid');
     if (!storedId) {
       storedId = 'user_' + Math.random().toString(36).substr(2, 9);
       localStorage.setItem('potecorn_uid', storedId);
     }
     setUserId(storedId);
-
   }, []);
 
-  // Fonction pour charger des films aléatoires
   const fetchRandomMoviesForSwipe = async () => {
     setLoadingMovies(true);
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
-      const randomPage = Math.floor(Math.random() * 50) + 1;
+      const randomPage = Math.floor(Math.random() * 20) + 1;
       const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc&page=${randomPage}`;
       
       const res = await fetch(url);
       const data = await res.json();
       
-      if (data.results) {
-        const shuffled = data.results.sort(() => 0.5 - Math.random());
+      if (data.results && data.results.length > 0) {
+        const shuffled = [...data.results].sort(() => 0.5 - Math.random());
         setSwipeQueue(shuffled);
         setCurrentIndex(0);
       }
@@ -55,29 +50,36 @@ export default function PoteCornPartyPage() {
     }
   }, [mode]);
 
-  // Déclencher le swipe avec animation CSS
   const handleSwipe = (direction: 'left' | 'right') => {
+    if (slideDirection) return; // Empêche les clics multiples trop rapides
     setSlideDirection(direction);
     
     const currentMovie = swipeQueue[currentIndex];
-    if (direction === 'right') {
-      console.log(`L'utilisateur ${userId} a AIMÉ :`, currentMovie.title);
-    } else {
-      console.log(`L'utilisateur ${userId} a REJETÉ :`, currentMovie.title);
+    if (currentMovie) {
+      if (direction === 'right') {
+        console.log(`[PoteCorn Party] Utilisateur ${userId} a AIMÉ :`, currentMovie.title);
+      } else {
+        console.log(`[PoteCorn Party] Utilisateur ${userId} a REJETÉ :`, currentMovie.title);
+      }
     }
 
-    // Changement de carte après la transition
     setTimeout(() => {
       setSlideDirection(null);
       if (currentIndex < swipeQueue.length - 1) {
-        setCurrentIndex(currentIndex + 1);
+        setCurrentIndex(prev => prev + 1);
       } else {
         fetchRandomMoviesForSwipe();
       }
     }, 250);
   };
 
-  if (!isMounted) return null;
+  if (!isMounted) {
+    return (
+      <main style={{ minHeight: '100vh', backgroundColor: '#000000', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
+        <p style={{ fontSize: '14px', color: '#A1A1AA' }}>Chargement de PoteCorn Party...</p>
+      </main>
+    );
+  }
 
   const currentMovie = swipeQueue[currentIndex];
 
@@ -86,10 +88,10 @@ export default function PoteCornPartyPage() {
       
       <style jsx global>{`
         @keyframes slideOutLeft {
-          to { transform: translateX(-120%) rotate(-20deg); opacity: 0; }
+          to { transform: translateX(-120%) rotate(-15deg); opacity: 0; }
         }
         @keyframes slideOutRight {
-          to { transform: translateX(120%) rotate(20deg); opacity: 0; }
+          to { transform: translateX(120%) rotate(15deg); opacity: 0; }
         }
         .anim-left { animation: slideOutLeft 0.25s forwards ease-in; }
         .anim-right { animation: slideOutRight 0.25s forwards ease-in; }
@@ -154,7 +156,7 @@ export default function PoteCornPartyPage() {
 
         {/* MOTEUR DE SWIPE */}
         {mode === 'solo' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: '480px' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <button 
@@ -169,10 +171,10 @@ export default function PoteCornPartyPage() {
             </div>
 
             {/* ZONE DE LA CARTE */}
-            <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '440px', overflow: 'hidden' }}>
               
               {loadingMovies ? (
-                <div style={{ textAlign: 'center', color: '#A1A1AA' }}>
+                <div style={{ textAlign: 'center', color: '#A1A1AA', padding: '40px 0' }}>
                   <span style={{ fontSize: '40px', display: 'block', marginBottom: '16px' }}>🍿</span>
                   <p>Recherche de pépites...</p>
                 </div>
@@ -216,13 +218,13 @@ export default function PoteCornPartyPage() {
                   </div>
                 </div>
               ) : (
-                <p>Aucun film trouvé.</p>
+                <p style={{ color: '#A1A1AA' }}>Chargement des films...</p>
               )}
             </div>
 
             {/* BOUTONS D'ACTION (SWIPE) */}
             {!loadingMovies && currentMovie && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', paddingBottom: '30px', marginTop: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', paddingBottom: '20px', marginTop: '20px' }}>
                 
                 <button 
                   onClick={() => handleSwipe('left')}
