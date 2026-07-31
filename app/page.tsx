@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import Image from 'next/image';
 
 const GENRES_LIST_MOVIES = [
   { id: 878, name: 'Science-Fiction 🚀' },
@@ -499,13 +498,10 @@ export default function HomePage() {
         {/* HEADER */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <Image 
+            <img 
               src="/logo.png" 
               alt="Logo PoteCorn" 
-              width={160} 
-              height={50} 
-              style={{ objectFit: 'contain' }}
-              priority
+              style={{ height: '45px', width: 'auto', objectFit: 'contain' }}
             />
           </div>
 
