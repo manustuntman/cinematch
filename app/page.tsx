@@ -67,7 +67,8 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
         flexDirection: 'column', 
         justifyContent: 'space-between',
         boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
       }}
     >
       <div>
@@ -213,7 +214,6 @@ export default function HomePage() {
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       
-      // 1. Tendances bas
       const trendingUrl = `https://api.themoviedb.org/3/trending/${mediaType}/week?api_key=${API_KEY}&language=fr-FR`;
       const trendingRes = await fetch(trendingUrl);
       const trendingData = await trendingRes.json();
@@ -221,13 +221,11 @@ export default function HomePage() {
         setTrendingMedia(trendingData.results.slice(0, 20));
       }
 
-      // 2. Coup de projecteur aléatoire / Pépites bien notées (vote_average >= 7.5) sur des pages aléatoires pour le carrousel haut
       const randomPage = Math.floor(Math.random() * 10) + 1;
       const discoverUrl = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&sort_by=vote_count.desc&vote_average.gte=7.5&page=${randomPage}`;
       const discoverRes = await fetch(discoverUrl);
       const discoverData = await discoverRes.json();
       if (discoverData.results) {
-        // Mélange les résultats pour un effet aléatoire à chaque chargement
         const shuffled = [...discoverData.results].sort(() => 0.5 - Math.random());
         setCarouselMedia(shuffled.slice(0, 12));
       }
@@ -540,7 +538,6 @@ export default function HomePage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Badge Popcorns Global */}
             <div style={{ backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.3)', padding: '6px 10px', borderRadius: '20px', fontSize: '11px', color: '#4ADE80', fontWeight: '700' }}>
               🍿 {watchedGlobalCount} vus
             </div>
@@ -642,7 +639,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* CAROUSEL "COUP DE PROJECTEUR" (PÉPITES ALÉATOIRES HAUT) */}
+        {/* CAROUSEL "COUP DE PROJECTEUR" (PÉPITES HAUT) */}
         {!isSetupComplete && carouselMedia.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
@@ -1004,10 +1001,21 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* MODALE FICHE MEDIA */}
+        {/* MODALE FICHE MEDIA AVEC EFFET GLOW NÉON */}
         {selectedMediaDetail && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
-            <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
+            <div style={{ 
+              backgroundColor: '#18181B', 
+              border: '1px solid rgba(147, 51, 234, 0.4)', 
+              borderRadius: '24px', 
+              maxWidth: '450px', 
+              width: '100%', 
+              maxHeight: '90vh', 
+              overflowY: 'auto', 
+              padding: '24px', 
+              position: 'relative', 
+              boxShadow: '0 0 40px rgba(147, 51, 234, 0.35), 0 25px 50px -12px rgba(0, 0, 0, 0.9)' 
+            }}>
               
               <button onClick={() => setSelectedMediaDetail(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700', zIndex: 10 }}>✕</button>
 
@@ -1050,7 +1058,7 @@ export default function HomePage() {
               {activeTab === 'info' && (
                 <div>
                   <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                    <img src={`https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}`} alt="" style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
+                    <img src={`https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}`} alt="" style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px', boxShadow: '0 0 15px rgba(147, 51, 234, 0.5)' }} />
                     <div style={{ flex: 1 }}>
                       <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 4px 0' }}>{selectedMediaDetail.title || selectedMediaDetail.name}</h2>
                       <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '8px', display: 'inline-block', marginBottom: '8px' }}>
