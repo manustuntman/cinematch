@@ -4,7 +4,6 @@ export async function POST(req: Request) {
   try {
     const { prompt, mediaType } = await req.json();
 
-    // On utilise la clé GROQ configurée sur Vercel
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: 'Clé API GROQ manquante sur Vercel' }, { status: 500 });
@@ -16,7 +15,6 @@ export async function POST(req: Request) {
 
     const typeLabel = mediaType === 'tv' ? 'séries TV' : 'films';
 
-    // Appel à l'API de Groq avec gestion des citations et répliques cultes
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -32,12 +30,12 @@ export async function POST(req: Request) {
             L'utilisateur peut te donner soit une description d'une envie, soit une réplique, une citation culte ou un extrait de dialogue dont il recherche le titre.
             - Si l'utilisateur tape une réplique ou citation, identifie en premier le film ou la série correspondant, mets-le en premier dans ta liste, et propose 4 autres ${typeLabel} similaires ou de la même ambiance.
             - Trouve exactement 5 ${typeLabel} au total pour le concept ou la réplique : "${prompt}".
-            Renvoie UNIQUEMENT un tableau JSON valide. Ne dis pas bonjour, ne mets aucune balise markdown. 
-            Exemple de format attendu :
-            [{"title": "Inception", "reason": "Correspond à la citation exacte et propose un voyage mental fascinant"}]`
+            
+            RÈGLE ABSOLUE : Renvoie STRICTEMENT un tableau JSON valide sous cette forme exacte, sans texte autour, sans markdown :
+            [{"title": "Titre exact", "reason": "Explication courte"}]`
           }
         ],
-        temperature: 0.5
+        temperature: 0.3
       })
     });
 
@@ -47,13 +45,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: data.error?.message || 'Erreur API Groq' }, { status: res.status });
     }
 
-    // Extraction et nettoyage de la réponse pour obtenir le tableau JSON
-    const rawText = data.choices[0].message.content || '[]';
-    const clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const rawText = data.choices[0]?.message?.content || '[]';
     
-    return NextResponse.json({ recommendations: JSON.parse(clean) });
+    // Nettoyage agressif pour isoler uniquement le tableau JSON
+    let clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const firstBracket = clean.indexOf('[');
+    const lastBracket = clean.lastIndexOf(']');
+    
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      clean = clean.substring(firstBracket, lastBracket + 1);
+    }
 
-} catch (err: any) {
+    let recommendations = [];
+    try {
+      recommendations = JSON.parse(clean);
+    } catch (parseError) {
+      console.error('Erreur de parsing JSON brut:', clean);
+      // Secours ultime : si le JSON est cassé, on renvoie un tableau vide propre pour éviter le crash
+      recommendations = [];
+    }
+
+    return NextResponse.json({ recommendations });
+
+  } catch (err: any) {
     console.error('Erreur serveur:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
