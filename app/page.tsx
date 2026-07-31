@@ -475,7 +475,7 @@ export default function HomePage() {
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#000000', color: '#FFFFFF', padding: '0 16px 24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', margin: 0, padding: '0 16px 24px 16px', overflowX: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
       
       {/* ANIMATION CSS POUR LE CAROUSEL FLUIDE */}
       <style jsx global>{`
@@ -497,7 +497,7 @@ export default function HomePage() {
         
         {/* HEADER */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', marginBottom: '16px' }}>
-        <div>
+          <div>
             <img 
               src="https://i.postimg.cc/DyWLbsDz/logo.png" 
               alt="Logo PoteCorn" 
