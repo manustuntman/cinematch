@@ -22,7 +22,6 @@ export default function BackstageDashboard() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Modifie le mot de passe secret ici si tu le souhaites
     if (passwordInput === 'PoteCornSecureAdmin2026!') {
       setIsAuthenticated(true);
       sessionStorage.setItem('potecorn_backstage_auth', 'true');
@@ -52,7 +51,6 @@ export default function BackstageDashboard() {
 
   if (!isMounted) return null;
 
-  // ÉCRAN DE CONNEXION SÉCURISÉ
   if (!isAuthenticated) {
     return (
       <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', fontFamily: 'system-ui, sans-serif' }}>
@@ -85,10 +83,11 @@ export default function BackstageDashboard() {
     );
   }
 
-  // CALCULS STATISTIQUES DU DASHBOARD
   const totalActions = watchlistItems.length;
   const watchedCount = watchlistItems.filter(i => i.status === 'watched').length;
   const toWatchCount = watchlistItems.filter(i => i.status === 'to_watch').length;
+  const moviesCount = watchlistItems.filter(i => i.media_type === 'movie').length;
+  const tvCount = watchlistItems.filter(i => i.media_type === 'tv').length;
 
   return (
     <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
@@ -110,24 +109,20 @@ export default function BackstageDashboard() {
           </div>
         </div>
 
-        {/* BLOCS DE STATS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
-          
+        {/* BLOCS DE STATS AMÉLIORÉS */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
           <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-            <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>Actions Totales</span>
-            <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#C084FC', margin: '6px 0 0 0' }}>{totalActions}</h3>
-          </div>
-
-          <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-            <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>Films Vus</span>
+            <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>🍿 Popcorns (Vus)</span>
             <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#4ADE80', margin: '6px 0 0 0' }}>{watchedCount}</h3>
           </div>
-
           <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-            <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>Watchlist</span>
+            <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>📌 Watchlist</span>
             <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#FBBF24', margin: '6px 0 0 0' }}>{toWatchCount}</h3>
           </div>
-
+          <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+            <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>🎬 Films vs Séries</span>
+            <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#C084FC', margin: '8px 0 0 0' }}>{moviesCount} 🎬 / {tvCount} 📺</h3>
+          </div>
         </div>
 
         {/* LISTE DE L'ACTIVITÉ RÉCENTE */}
