@@ -255,10 +255,18 @@ export default function HomePage() {
       const fetchedResults: any[] = [];
 
       for (const rec of aiData.recommendations) {
-        const tmdbRes = await fetch(
+        let tmdbRes = await fetch(
           `https://api.themoviedb.org/3/search/${mediaType}?api_key=${API_KEY_TMDB}&language=fr-FR&query=${encodeURIComponent(rec.title)}&page=1`
         );
-        const tmdbData = await tmdbRes.json();
+        let tmdbData = await tmdbRes.json();
+
+        if (!tmdbData.results || tmdbData.results.length === 0) {
+          const simplifiedTitle = rec.title.split(':')[0].split('-')[0].trim();
+          tmdbRes = await fetch(
+            `https://api.themoviedb.org/3/search/${mediaType}?api_key=${API_KEY_TMDB}&language=fr-FR&query=${encodeURIComponent(simplifiedTitle)}&page=1`
+          );
+          tmdbData = await tmdbRes.json();
+        }
 
         if (tmdbData.results && tmdbData.results.length > 0) {
           fetchedResults.push({
@@ -643,7 +651,7 @@ export default function HomePage() {
             </div>
             
             <p style={{ fontSize: '11px', color: '#D4D4D8', margin: '0 0 12px 0' }}>
-              Décris ton envie en langage naturel (ex: <i>"Un film de voyage dans le temps qui fait réfléchir"</i>).
+              Décris ton envie ou tape une phrase culte (ex: <i>"Il s'appelle Juste Leblanc"</i>).
             </p>
 
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -651,7 +659,7 @@ export default function HomePage() {
                 type="text"
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Ex: voyage dans le temps..."
+                placeholder="Ex: réplique culte, voyage dans le temps..."
                 onKeyDown={(e) => e.key === 'Enter' && handleAiSearch()}
                 style={{
                   flex: 1,
