@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 export default function PoteCornPartyPage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -12,7 +11,7 @@ export default function PoteCornPartyPage() {
   const [swipeQueue, setSwipeQueue] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loadingMovies, setLoadingMovies] = useState(false);
-  const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -56,9 +55,9 @@ export default function PoteCornPartyPage() {
     }
   }, [mode]);
 
-  // Déclencher le swipe via les boutons ou le geste
-  const triggerSwipe = (direction: 'left' | 'right') => {
-    setExitDirection(direction);
+  // Déclencher le swipe avec animation CSS
+  const handleSwipe = (direction: 'left' | 'right') => {
+    setSlideDirection(direction);
     
     const currentMovie = swipeQueue[currentIndex];
     if (direction === 'right') {
@@ -67,15 +66,15 @@ export default function PoteCornPartyPage() {
       console.log(`L'utilisateur ${userId} a REJETÉ :`, currentMovie.title);
     }
 
-    // Passer au film suivant après l'animation
+    // Changement de carte après la transition
     setTimeout(() => {
-      setExitDirection(null);
+      setSlideDirection(null);
       if (currentIndex < swipeQueue.length - 1) {
         setCurrentIndex(currentIndex + 1);
       } else {
         fetchRandomMoviesForSwipe();
       }
-    }, 200);
+    }, 250);
   };
 
   if (!isMounted) return null;
@@ -84,6 +83,18 @@ export default function PoteCornPartyPage() {
 
   return (
     <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box', overflowX: 'hidden' }}>
+      
+      <style jsx global>{`
+        @keyframes slideOutLeft {
+          to { transform: translateX(-120%) rotate(-20deg); opacity: 0; }
+        }
+        @keyframes slideOutRight {
+          to { transform: translateX(120%) rotate(20deg); opacity: 0; }
+        }
+        .anim-left { animation: slideOutLeft 0.25s forwards ease-in; }
+        .anim-right { animation: slideOutRight 0.25s forwards ease-in; }
+      `}</style>
+
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         
         {/* HEADER */}
@@ -141,7 +152,7 @@ export default function PoteCornPartyPage() {
           </div>
         )}
 
-        {/* MOTEUR DE SWIPE ANIMÉ */}
+        {/* MOTEUR DE SWIPE */}
         {mode === 'solo' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
             
@@ -153,11 +164,11 @@ export default function PoteCornPartyPage() {
                 ← Quitter
               </button>
               <span style={{ fontSize: '11px', color: '#A1A1AA', fontWeight: '600' }}>
-                Glisse ou clique 👇
+                Entraînement actif 🧠
               </span>
             </div>
 
-            {/* ZONE DE LA CARTE SWILABLE */}
+            {/* ZONE DE LA CARTE */}
             <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
               
               {loadingMovies ? (
@@ -166,74 +177,55 @@ export default function PoteCornPartyPage() {
                   <p>Recherche de pépites...</p>
                 </div>
               ) : currentMovie ? (
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={currentMovie.id}
-                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                    animate={{ 
-                      scale: 1, 
-                      opacity: 1, 
-                      x: exitDirection === 'left' ? -300 : exitDirection === 'right' ? 300 : 0,
-                      rotate: exitDirection === 'left' ? -20 : exitDirection === 'right' ? 20 : 0 
-                    }}
-                    exit={{ opacity: 0, transition: { duration: 0.2 } }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    onDragEnd={(e, info) => {
-                      if (info.offset.x > 100) {
-                        triggerSwipe('right');
-                      } else if (info.offset.x < -100) {
-                        triggerSwipe('left');
-                      }
-                    }}
-                    style={{ 
-                      width: '100%', 
-                      maxWidth: '340px', 
-                      backgroundColor: '#18181B', 
-                      borderRadius: '24px', 
-                      overflow: 'hidden',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
-                      cursor: 'grab',
-                      position: 'absolute'
-                    }}
-                  >
-                    <div style={{ position: 'relative', height: '440px', pointerEvents: 'none' }}>
-                      <img 
-                        src={currentMovie.poster_path ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` : 'https://via.placeholder.com/340x440'} 
-                        alt={currentMovie.title}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '150px', background: 'linear-gradient(to top, rgba(24,24,27,1), rgba(24,24,27,0))' }} />
-                      
-                      <div style={{ position: 'absolute', bottom: '20px', left: '20px', right: '20px' }}>
-                        <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 6px 0', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
-                          {currentMovie.title}
-                        </h2>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                          <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.9)', color: '#000', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '800' }}>
-                            ★ {currentMovie.vote_average?.toFixed(1)}
-                          </span>
-                          <span style={{ color: '#D4D4D8', fontSize: '12px', fontWeight: '600' }}>
-                            {currentMovie.release_date ? currentMovie.release_date.split('-')[0] : ''}
-                          </span>
-                        </div>
+                <div
+                  key={currentMovie.id}
+                  className={slideDirection === 'left' ? 'anim-left' : slideDirection === 'right' ? 'anim-right' : ''}
+                  style={{ 
+                    width: '100%', 
+                    maxWidth: '340px', 
+                    backgroundColor: '#18181B', 
+                    borderRadius: '24px', 
+                    overflow: 'hidden',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
+                    position: 'absolute',
+                    transition: 'transform 0.2s ease'
+                  }}
+                >
+                  <div style={{ position: 'relative', height: '440px' }}>
+                    <img 
+                      src={currentMovie.poster_path ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` : 'https://via.placeholder.com/340x440'} 
+                      alt={currentMovie.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '150px', background: 'linear-gradient(to top, rgba(24,24,27,1), rgba(24,24,27,0))' }} />
+                    
+                    <div style={{ position: 'absolute', bottom: '20px', left: '20px', right: '20px' }}>
+                      <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 6px 0', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
+                        {currentMovie.title}
+                      </h2>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.9)', color: '#000', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '800' }}>
+                          ★ {currentMovie.vote_average?.toFixed(1)}
+                        </span>
+                        <span style={{ color: '#D4D4D8', fontSize: '12px', fontWeight: '600' }}>
+                          {currentMovie.release_date ? currentMovie.release_date.split('-')[0] : ''}
+                        </span>
                       </div>
                     </div>
-                  </motion.div>
-                </AnimatePresence>
+                  </div>
+                </div>
               ) : (
                 <p>Aucun film trouvé.</p>
               )}
             </div>
 
-            {/* BOUTONS D'ACTION (SWIPE GAUCHE / DROITE) */}
+            {/* BOUTONS D'ACTION (SWIPE) */}
             {!loadingMovies && currentMovie && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', paddingBottom: '30px', marginTop: '20px' }}>
                 
                 <button 
-                  onClick={() => triggerSwipe('left')}
+                  onClick={() => handleSwipe('left')}
                   style={{ 
                     width: '70px', 
                     height: '70px', 
@@ -246,15 +238,14 @@ export default function PoteCornPartyPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 10px 20px rgba(0,0,0,0.3)',
-                    transition: 'transform 0.1s'
+                    boxShadow: '0 10px 20px rgba(0,0,0,0.3)'
                   }}
                 >
                   ❌
                 </button>
 
                 <button 
-                  onClick={() => triggerSwipe('right')}
+                  onClick={() => handleSwipe('right')}
                   style={{ 
                     width: '70px', 
                     height: '70px', 
@@ -267,8 +258,7 @@ export default function PoteCornPartyPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 10px 25px rgba(236, 72, 153, 0.3)',
-                    transition: 'transform 0.1s'
+                    boxShadow: '0 10px 25px rgba(236, 72, 153, 0.3)'
                   }}
                 >
                   ❤️
