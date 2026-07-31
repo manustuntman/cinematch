@@ -89,6 +89,22 @@ export default function BackstageDashboard() {
   const moviesCount = watchlistItems.filter(i => i.media_type === 'movie').length;
   const tvCount = watchlistItems.filter(i => i.media_type === 'tv').length;
 
+  // Calcul du Top 3 des films/séries les plus présents dans les listes
+  const getTopNuggets = () => {
+    const counts: { [key: string]: { title: string; poster: string; count: number; type: string } } = {};
+    watchlistItems.forEach(item => {
+      if (!counts[item.title]) {
+        counts[item.title] = { title: item.title, poster: item.poster_path, count: 0, type: item.media_type };
+      }
+      counts[item.title].count += 1;
+    });
+    return Object.values(counts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+  };
+
+  const topNuggets = getTopNuggets();
+
   return (
     <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
       <div style={{ maxWidth: '700px', margin: '0 auto' }}>
@@ -109,7 +125,7 @@ export default function BackstageDashboard() {
           </div>
         </div>
 
-        {/* BLOCS DE STATS AMÉLIORÉS */}
+        {/* BLOCS DE STATS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
           <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
             <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>🍿 Popcorns (Vus)</span>
@@ -125,10 +141,30 @@ export default function BackstageDashboard() {
           </div>
         </div>
 
-        {/* LISTE DE L'ACTIVITÉ RÉCENTE */}
+        {/* SECTION NOUVEAUTÉ : TOP 3 DES PÉPITES */}
+        {topNuggets.length > 0 && (
+          <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '20px', padding: '20px', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: '800', margin: '0 0 12px 0', color: '#FBBF24' }}>🏆 Top 3 des pépites plébiscitées</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              {topNuggets.map((item, idx) => (
+                <div key={idx} style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '10px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {item.poster ? (
+                    <img src={item.poster} alt="" style={{ width: '45px', height: '65px', objectFit: 'cover', borderRadius: '6px', margin: '0 auto 6px auto', display: 'block' }} />
+                  ) : (
+                    <div style={{ width: '45px', height: '65px', backgroundColor: '#3F3F46', borderRadius: '6px', margin: '0 auto 6px auto' }} />
+                  )}
+                  <h4 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>{item.title}</h4>
+                  <span style={{ fontSize: '9px', color: '#FBBF24', fontWeight: '700' }}>#{idx + 1} ({item.count} interaction{item.count > 1 ? 's' : ''})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* JOURNAL DE BORD GLOBAL (ACTIVITÉ RÉCENTE) */}
         <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: '800', margin: 0 }}>🕒 Activité récente sur l'app</h2>
+            <h2 style={{ fontSize: '15px', fontWeight: '800', margin: 0 }}>📜 Journal de bord global</h2>
             <button onClick={fetchAdminData} style={{ background: 'none', border: 'none', color: '#C084FC', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
               🔄 Actualiser
             </button>
