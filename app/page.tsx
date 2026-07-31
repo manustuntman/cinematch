@@ -123,6 +123,7 @@ export default function HomePage() {
   const [rouletteMedia, setRouletteMedia] = useState<any>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedMediaDetail, setSelectedMediaDetail] = useState<any>(null);
+  const [watchedGlobalCount, setWatchedGlobalCount] = useState<number>(0);
 
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -158,7 +159,20 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
+    fetchGlobalStats();
   }, []);
+
+  const fetchGlobalStats = async () => {
+    try {
+      const { data } = await supabase.from('watchlist').select('status');
+      if (data) {
+        const vus = data.filter(item => item.status === 'watched').length;
+        setWatchedGlobalCount(vus);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchUserPlaylists = async () => {
     try {
@@ -195,15 +209,27 @@ export default function HomePage() {
     }
   };
 
-  const fetchTrending = async () => {
+  const fetchTrendingAndSpotlight = async () => {
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
-      const url = `https://api.themoviedb.org/3/trending/${mediaType}/week?api_key=${API_KEY}&language=fr-FR`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.results) {
-        setTrendingMedia(data.results.slice(0, 20));
-        setCarouselMedia(data.results.slice(0, 12));
+      
+      // 1. Tendances bas
+      const trendingUrl = `https://api.themoviedb.org/3/trending/${mediaType}/week?api_key=${API_KEY}&language=fr-FR`;
+      const trendingRes = await fetch(trendingUrl);
+      const trendingData = await trendingRes.json();
+      if (trendingData.results) {
+        setTrendingMedia(trendingData.results.slice(0, 20));
+      }
+
+      // 2. Coup de projecteur aléatoire / Pépites bien notées (vote_average >= 7.5) sur des pages aléatoires pour le carrousel haut
+      const randomPage = Math.floor(Math.random() * 10) + 1;
+      const discoverUrl = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&sort_by=vote_count.desc&vote_average.gte=7.5&page=${randomPage}`;
+      const discoverRes = await fetch(discoverUrl);
+      const discoverData = await discoverRes.json();
+      if (discoverData.results) {
+        // Mélange les résultats pour un effet aléatoire à chaque chargement
+        const shuffled = [...discoverData.results].sort(() => 0.5 - Math.random());
+        setCarouselMedia(shuffled.slice(0, 12));
       }
     } catch (err) {
       console.error(err);
@@ -440,6 +466,7 @@ export default function HomePage() {
       if (error) throw error;
       setFeedback(status === 'to_watch' ? '📌 Ajouté à la Watchlist !' : '👁️ Marqué comme vu !');
       setSelectedMediaDetail(null);
+      fetchGlobalStats();
     } catch (err) {
       setFeedback(`⚠️ Erreur lors de la sauvegarde`);
     }
@@ -472,7 +499,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (isMounted) {
-      fetchTrending();
+      fetchTrendingAndSpotlight();
     }
   }, [mediaType, isMounted]);
 
@@ -502,7 +529,7 @@ export default function HomePage() {
 
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
-        {/* HEADER */}
+        {/* HEADER AVEC COMPTEUR DE POPCORNS GLOBAL */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', marginBottom: '16px' }}>
           <div>
             <img 
@@ -512,23 +539,30 @@ export default function HomePage() {
             />
           </div>
 
-          <a 
-            href="/profile" 
-            title="Mon Profil & XP"
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              backgroundColor: 'rgba(24, 24, 27, 0.8)', 
-              border: '1px solid rgba(255, 255, 255, 0.15)', 
-              padding: '6px 12px 6px 6px', 
-              borderRadius: '30px', 
-              textDecoration: 'none'
-            }}
-          >
-            <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold' }}>👤</div>
-            <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>Profil / XP</span>
-          </a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Badge Popcorns Global */}
+            <div style={{ backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.3)', padding: '6px 10px', borderRadius: '20px', fontSize: '11px', color: '#4ADE80', fontWeight: '700' }}>
+              🍿 {watchedGlobalCount} vus
+            </div>
+
+            <a 
+              href="/profile" 
+              title="Mon Profil & XP"
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                backgroundColor: 'rgba(24, 24, 27, 0.8)', 
+                border: '1px solid rgba(255, 255, 255, 0.15)', 
+                padding: '6px 12px 6px 6px', 
+                borderRadius: '30px', 
+                textDecoration: 'none'
+              }}
+            >
+              <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold' }}>👤</div>
+              <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>Profil</span>
+            </a>
+          </div>
         </header>
 
         {/* BARRE DE RECHERCHE RAPIDE */}
@@ -608,26 +642,31 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* CAROUSEL FLUIDE EN MOUVEMENT */}
+        {/* CAROUSEL "COUP DE PROJECTEUR" (PÉPITES ALÉATOIRES HAUT) */}
         {!isSetupComplete && carouselMedia.length > 0 && (
-          <div style={{ marginBottom: '20px', overflow: 'hidden', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(24, 24, 27, 0.4)', padding: '10px 0', position: 'relative' }}>
-            <div className="animate-marquee" style={{ display: 'flex', gap: '12px' }}>
-              {[...carouselMedia, ...carouselMedia].map((item, idx) => (
-                <div 
-                  key={`${item.id}-${idx}`}
-                  onClick={() => openMediaModal(item)}
-                  style={{ width: '80px', height: '115px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, cursor: 'pointer', position: 'relative', border: '1px solid rgba(255,255,255,0.15)' }}
-                >
-                  <img 
-                    src={item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : 'https://via.placeholder.com/80x115'} 
-                    alt="" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                  />
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.75)', padding: '2px 4px', fontSize: '8px', color: '#FBBF24', textAlign: 'center', fontWeight: '700' }}>
-                    ★ {item.vote_average?.toFixed(1)}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase', letterSpacing: '1px' }}>✨ Coup de projecteur (Pépites à découvrir)</span>
+            </div>
+            <div style={{ overflow: 'hidden', borderRadius: '16px', border: '1px solid rgba(251, 191, 36, 0.2)', backgroundColor: 'rgba(24, 24, 27, 0.4)', padding: '10px 0', position: 'relative' }}>
+              <div className="animate-marquee" style={{ display: 'flex', gap: '12px' }}>
+                {[...carouselMedia, ...carouselMedia].map((item, idx) => (
+                  <div 
+                    key={`${item.id}-${idx}`}
+                    onClick={() => openMediaModal(item)}
+                    style={{ width: '80px', height: '115px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, cursor: 'pointer', position: 'relative', border: '1px solid rgba(255,255,255,0.15)' }}
+                  >
+                    <img 
+                      src={item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : 'https://via.placeholder.com/80x115'} 
+                      alt="" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.75)', padding: '2px 4px', fontSize: '8px', color: '#FBBF24', textAlign: 'center', fontWeight: '700' }}>
+                      ★ {item.vote_average?.toFixed(1)}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -695,7 +734,6 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* RÉSULTATS DE L'ASSISTANT IA */}
             {aiResults.length > 0 && (
               <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '12px' }}>
                 {aiResults.map((item) => (
