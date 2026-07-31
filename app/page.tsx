@@ -527,7 +527,7 @@ export default function HomePage() {
 
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
-        {/* HEADER AVEC COMPTEUR DE POPCORNS GLOBAL */}
+        {/* HEADER */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', marginBottom: '16px' }}>
           <div>
             <img 
@@ -601,7 +601,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* NAVIGATION SECONDAIRE */}
+        {/* NAVIGATION SECONDAIRE AVEC POTECORN PARTY */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           {isSetupComplete ? (
             <button
@@ -624,6 +624,9 @@ export default function HomePage() {
           )}
 
           <div style={{ display: 'flex', gap: '8px' }}>
+            <a href="/potecorn-party" style={{ color: '#EC4899', fontSize: '12px', fontWeight: '700', textDecoration: 'none', backgroundColor: 'rgba(236, 72, 153, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
+              🔥 PoteCorn Party
+            </a>
             <a href="/playlists" style={{ color: '#FBBF24', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(251, 191, 36, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
               🎵 Playlists
             </a>
@@ -639,7 +642,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* CAROUSEL "COUP DE PROJECTEUR" (PÉPITES HAUT) */}
+        {/* CAROUSEL COUP DE PROJECTEUR */}
         {!isSetupComplete && carouselMedia.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
@@ -668,7 +671,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ASSISTANT IA (PROMPT INTELLIGENT) */}
+        {/* ASSISTANT IA */}
         {!isSetupComplete && (
           <div style={{ 
             background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.25), rgba(59, 130, 246, 0.2))', 
