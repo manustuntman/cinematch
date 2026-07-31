@@ -423,7 +423,7 @@ export default function HomePage() {
         return;
       }
 
-      const { error } = await supabase.from('watchlist').insert([
+      const { error } = await supabase.from('watchlist'].insert([
         {
           movie_id: movieIdStr,
           title: title,
@@ -485,7 +485,6 @@ export default function HomePage() {
   return (
     <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', margin: 0, padding: '0 16px 24px 16px', overflowX: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
       
-      {/* ANIMATION CSS POUR LE CAROUSEL FLUIDE */}
       <style jsx global>{`
         @keyframes scrollMarquee {
           0% { transform: translateX(0); }
@@ -1072,9 +1071,9 @@ export default function HomePage() {
 
                         {mediaDetailsExt.freeProviders.length === 0 && mediaDetailsExt.providers.length === 0 && (
                           <div>
-                            <span style={{ fontSize: '11px', color: '#FBBF24', fontWeight: '700', display: 'block', marginBottom: '8px' }}>🍿 Au cinéma ou en diffusion TV !</span>
-                            <a href={`https://www.google.com/search?q=seance+${encodeURIComponent(selectedMediaDetail.title || selectedMediaDetail.name)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#9333EA', color: '#FFF', textDecoration: 'none', fontSize: '11px', fontWeight: '700', padding: '8px 12px', borderRadius: '10px' }}>
-                              📍 Chercher les séances près de chez moi →
+                            <span style={{ fontSize: '11px', color: '#A1A1AA', fontWeight: '700', display: 'block', marginBottom: '8px' }}>🚫 Indisponible en streaming en France</span>
+                            <a href={`https://www.google.com/search?q=regarder+${encodeURIComponent(selectedMediaDetail.title || selectedMediaDetail.name)+'+streaming+vod'}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255,255,255,0.08)', color: '#FFF', textDecoration: 'none', fontSize: '11px', fontWeight: '700', padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)' }}>
+                              🔍 Chercher en VOD / Achat web →
                             </a>
                           </div>
                         )}
