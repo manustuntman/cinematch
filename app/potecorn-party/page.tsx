@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function PoteCornPartyPage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -10,7 +10,12 @@ export default function PoteCornPartyPage() {
   const [swipeQueue, setSwipeQueue] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loadingMovies, setLoadingMovies] = useState(false);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const [animatingDir, setAnimatingDir] = useState<'left' | 'right' | null>(null);
+
+  // États pour gérer le tactile (drag avec le doigt)
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchCurrentX, setTouchCurrentX] = useState<number | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -51,9 +56,9 @@ export default function PoteCornPartyPage() {
   }, [mode]);
 
   const handleSwipe = (direction: 'left' | 'right') => {
-    if (slideDirection) return; // Empêche les clics multiples trop rapides
-    setSlideDirection(direction);
-    
+    if (animatingDir) return;
+    setAnimatingDir(direction);
+
     const currentMovie = swipeQueue[currentIndex];
     if (currentMovie) {
       if (direction === 'right') {
@@ -64,13 +69,41 @@ export default function PoteCornPartyPage() {
     }
 
     setTimeout(() => {
-      setSlideDirection(null);
+      setAnimatingDir(null);
+      setTouchStartX(null);
+      setTouchCurrentX(null);
       if (currentIndex < swipeQueue.length - 1) {
         setCurrentIndex(prev => prev + 1);
       } else {
         fetchRandomMoviesForSwipe();
       }
-    }, 250);
+    }, 300);
+  };
+
+  // Gestion du Tactile (Swipe avec le doigt)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    setTouchCurrentX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX === null || touchCurrentX === null) return;
+    const diff = touchCurrentX - touchStartX;
+
+    // Seuil de glissement (si on glisse de plus de 80 pixels)
+    if (diff > 80) {
+      handleSwipe('right');
+    } else if (diff < -80) {
+      handleSwipe('left');
+    } else {
+      // Remise à zéro si on n'a pas assez glissé
+      setTouchStartX(null);
+      setTouchCurrentX(null);
+    }
   };
 
   if (!isMounted) {
@@ -83,18 +116,28 @@ export default function PoteCornPartyPage() {
 
   const currentMovie = swipeQueue[currentIndex];
 
+  // Calcul du décalage de la carte en temps réel pendant que le doigt glisse
+  const touchOffset = touchStartX !== null && touchCurrentX !== null ? touchCurrentX - touchStartX : 0;
+  const touchRotation = touchOffset * 0.05;
+
   return (
-    <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box', overflowX: 'hidden' }}>
+    <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box', overflowX: 'hidden', touchAction: 'pan-y' }}>
       
       <style jsx global>{`
-        @keyframes slideOutLeft {
-          to { transform: translateX(-120%) rotate(-15deg); opacity: 0; }
+        @keyframes swipeLeft {
+          0% { transform: translateX(var(--drag-x, 0px)) rotate(var(--drag-rot, 0deg)); opacity: 1; }
+          100% { transform: translateX(-120vw) rotate(-25deg); opacity: 0; }
         }
-        @keyframes slideOutRight {
-          to { transform: translateX(120%) rotate(15deg); opacity: 0; }
+        @keyframes swipeRight {
+          0% { transform: translateX(var(--drag-x, 0px)) rotate(var(--drag-rot, 0deg)); opacity: 1; }
+          100% { transform: translateX(120vw) rotate(25deg); opacity: 0; }
         }
-        .anim-left { animation: slideOutLeft 0.25s forwards ease-in; }
-        .anim-right { animation: slideOutRight 0.25s forwards ease-in; }
+        .animate-swipe-left {
+          animation: swipeLeft 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+        .animate-swipe-right {
+          animation: swipeRight 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
       `}</style>
 
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -166,11 +209,11 @@ export default function PoteCornPartyPage() {
                 ← Quitter
               </button>
               <span style={{ fontSize: '11px', color: '#A1A1AA', fontWeight: '600' }}>
-                Entraînement actif 🧠
+                Glisse à gauche ❌ ou droite ❤️
               </span>
             </div>
 
-            {/* ZONE DE LA CARTE */}
+            {/* ZONE DE LA CARTE TACTILE */}
             <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '440px', overflow: 'hidden' }}>
               
               {loadingMovies ? (
@@ -180,8 +223,12 @@ export default function PoteCornPartyPage() {
                 </div>
               ) : currentMovie ? (
                 <div
+                  ref={cardRef}
                   key={currentMovie.id}
-                  className={slideDirection === 'left' ? 'anim-left' : slideDirection === 'right' ? 'anim-right' : ''}
+                  className={animatingDir === 'left' ? 'animate-swipe-left' : animatingDir === 'right' ? 'animate-swipe-right' : ''}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
                   style={{ 
                     width: '100%', 
                     maxWidth: '340px', 
@@ -191,10 +238,15 @@ export default function PoteCornPartyPage() {
                     border: '1px solid rgba(255,255,255,0.15)',
                     boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
                     position: 'absolute',
-                    transition: 'transform 0.2s ease'
+                    cursor: 'grab',
+                    userSelect: 'none',
+                    transform: animatingDir ? undefined : `translateX(${touchOffset}px) rotate(${touchRotation}deg)`,
+                    transition: touchStartX === null ? 'transform 0.2s ease' : 'none',
+                    ['--drag-x' as any]: `${touchOffset}px`,
+                    ['--drag-rot' as any]: `${touchRotation}deg`
                   }}
                 >
-                  <div style={{ position: 'relative', height: '440px' }}>
+                  <div style={{ position: 'relative', height: '440px', pointerEvents: 'none' }}>
                     <img 
                       src={currentMovie.poster_path ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` : 'https://via.placeholder.com/340x440'} 
                       alt={currentMovie.title}
@@ -222,7 +274,7 @@ export default function PoteCornPartyPage() {
               )}
             </div>
 
-            {/* BOUTONS D'ACTION (SWIPE) */}
+            {/* BOUTONS D'ACTION (Toujours dispo au cas où) */}
             {!loadingMovies && currentMovie && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', paddingBottom: '20px', marginTop: '20px' }}>
                 
