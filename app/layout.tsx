@@ -1,14 +1,24 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import './globals.css';
+
+export const viewport: Viewport = {
+  themeColor: '#000000',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
 
 export const metadata: Metadata = {
-  title: 'CineMatch 🎬 - Films & Séries Sur-Mesure',
-  description: 'Trouve instantanément ton prochain film ou ta prochaine série sans perdre de temps.',
+  title: 'PoteCorn - Votre compagnon cinéphile',
+  description: "Trouvez le film ou la série parfaite grâce à l'IA.",
   manifest: '/manifest.json',
-  themeColor: '#9333EA',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'CineMatch',
+    statusBarStyle: 'default',
+    title: 'PoteCorn',
+  },
+  icons: {
+    apple: '/icon-192.png',
   },
 };
 
@@ -19,7 +29,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr">
-      <body style={{ margin: 0, backgroundColor: '#0A0A0A', color: '#FFFFFF' }}>
+      <body>
         {children}
       </body>
     </html>
