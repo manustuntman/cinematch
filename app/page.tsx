@@ -423,7 +423,7 @@ export default function HomePage() {
         return;
       }
 
-      const { error } = await supabase.from('watchlist'].insert([
+      const { error } = await supabase.from('watchlist').insert([
         {
           movie_id: movieIdStr,
           title: title,
