@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import Image from 'next/image';
 
 const GENRES_LIST_MOVIES = [
   { id: 878, name: 'Science-Fiction 🚀' },
@@ -114,7 +115,7 @@ export default function HomePage() {
   const [selectedAversions, setSelectedAversions] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
-  const [searchQuery, setSearchQuery] = useState('');                 
+  const [searchQuery, setSearchQuery] = useState('');                  
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
   const [trendingMedia, setTrendingMedia] = useState<any[]>([]);
@@ -124,7 +125,6 @@ export default function HomePage() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedMediaDetail, setSelectedMediaDetail] = useState<any>(null);
 
-  // ÉTATS DE L'ASSISTANT IA
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResults, setAiResults] = useState<any[]>([]);
@@ -230,7 +230,6 @@ export default function HomePage() {
     }
   };
 
-  // RECHERCHE PAR ASSISTANT IA (AVEC DIAGNOSTIC D'ERREURS DÉTAILLÉ)
   const handleAiSearch = async () => {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
@@ -387,7 +386,7 @@ export default function HomePage() {
   const shareCard = () => {
     if (!selectedMediaDetail) return;
     const title = selectedMediaDetail.title || selectedMediaDetail.name;
-    const textToShare = `🎬 Mon avis sur "${title}" sur CineMatch :\nNote: ${'⭐'.repeat(userRating || 5)}\nAmbiance: ${selectedTags.join(', ')}\nRemarques: "${userNotes || 'À ne pas manquer !'}"`;
+    const textToShare = `🎬 Mon avis sur "${title}" sur PoteCorn :\nNote: ${'⭐'.repeat(userRating || 5)}\nAmbiance: ${selectedTags.join(', ')}\nRemarques: "${userNotes || 'À ne pas manquer !'}"`;
     
     if (navigator.clipboard) {
       navigator.clipboard.writeText(textToShare);
@@ -500,9 +499,14 @@ export default function HomePage() {
         {/* HEADER */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <h1 style={{ fontSize: '26px', fontWeight: '800', background: 'linear-gradient(to right, #C084FC, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
-              CineMatch 🎬
-            </h1>
+            <Image 
+              src="/logo.png" 
+              alt="Logo PoteCorn" 
+              width={160} 
+              height={50} 
+              style={{ objectFit: 'contain' }}
+              priority
+            />
           </div>
 
           <a 
