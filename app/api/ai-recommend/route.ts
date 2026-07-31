@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
     const typeLabel = mediaType === 'tv' ? 'séries TV' : 'films';
 
-    // Appel à l'API de Groq
+    // Appel à l'API de Groq avec gestion des citations et répliques cultes
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -24,15 +24,17 @@ export async function POST(req: Request) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // <-- LE NOUVEAU MODÈLE ACTIF ET PUISSANT
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',
-            content: `Tu es un expert cinéma et recommandeur ultra-pointu.
-            Trouve exactement 5 ${typeLabel} pour le concept : "${prompt}".
+            content: `Tu es un expert cinéma et recommandeur ultra-pointu. 
+            L'utilisateur peut te donner soit une description d'une envie, soit une réplique, une citation culte ou un extrait de dialogue dont il recherche le titre.
+            - Si l'utilisateur tape une réplique ou citation, identifie en premier le film ou la série correspondant, mets-le en premier dans ta liste, et propose 4 autres ${typeLabel} similaires ou de la même ambiance.
+            - Trouve exactement 5 ${typeLabel} au total pour le concept ou la réplique : "${prompt}".
             Renvoie UNIQUEMENT un tableau JSON valide. Ne dis pas bonjour, ne mets aucune balise markdown. 
             Exemple de format attendu :
-            [{"title": "Inception", "reason": "Un voyage mental fascinant dans les rêves"}]`
+            [{"title": "Inception", "reason": "Correspond à la citation exacte et propose un voyage mental fascinant"}]`
           }
         ],
         temperature: 0.5
@@ -51,7 +53,7 @@ export async function POST(req: Request) {
     
     return NextResponse.json({ recommendations: JSON.parse(clean) });
 
-  } catch (err: any) {
+} catch (err: any) {
     console.error('Erreur serveur:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
