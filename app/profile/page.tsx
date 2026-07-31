@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string>('');
   const [stats, setStats] = useState({
     watchedCount: 0,
     toWatchCount: 0,
@@ -14,27 +15,30 @@ export default function ProfilePage() {
     level: 1,
     xpProgress: 0,
   });
+  const [swipes, setSwipes] = useState<any[]>([]);
 
-  const fetchProfileStats = async () => {
+  const fetchProfileData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('watchlist').select('*');
-      if (error) throw error;
+      // 1. Récupération de l'ID local
+      const storedId = localStorage.getItem('potecorn_uid') || '';
+      setUserId(storedId);
 
-      if (data) {
-        const watched = data.filter((item) => item.status === 'watched');
-        const toWatch = data.filter((item) => item.status === 'to_watch');
+      // 2. Chargement de la Watchlist pour les stats & XP
+      const { data: watchlistData, error: watchlistError } = await supabase.from('watchlist').select('*');
+      if (watchlistError) throw watchlistError;
 
-        // Comptage séparé des films et séries vus
+      if (watchlistData) {
+        const watched = watchlistData.filter((item) => item.status === 'watched');
+        const toWatch = watchlistData.filter((item) => item.status === 'to_watch');
+
         const moviesWatched = watched.filter((item) => item.media_type === 'movie' || !item.media_type).length;
         const tvWatched = watched.filter((item) => item.media_type === 'tv').length;
 
-        // Calcul de l'XP (100 XP par film/série vu + 20 XP par élément en watchlist)
         const xpFromWatched = watched.length * 100;
         const xpFromToWatch = toWatch.length * 20;
         const calculatedXP = xpFromWatched + xpFromToWatch;
 
-        // Système de niveau (Tous les 500 XP = 1 niveau)
         const currentLevel = Math.floor(calculatedXP / 500) + 1;
         const progressPercentage = ((calculatedXP % 500) / 500) * 100;
 
@@ -48,6 +52,20 @@ export default function ProfilePage() {
           xpProgress: progressPercentage,
         });
       }
+
+      // 3. Chargement des Swipes PoteCorn Party de l'utilisateur
+      if (storedId) {
+        const { data: swipesData, error: swipesError } = await supabase
+          .from('user_swipes')
+          .select('*')
+          .eq('user_uid', storedId)
+          .order('created_at', { ascending: false });
+
+        if (!swipesError && swipesData) {
+          setSwipes(swipesData);
+        }
+      }
+
     } catch (err) {
       console.error('Erreur lors du chargement du profil :', err);
     }
@@ -55,8 +73,11 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    fetchProfileStats();
+    fetchProfileData();
   }, []);
+
+  const likedMovies = swipes.filter(s => s.action === 'liked');
+  const dislikedMovies = swipes.filter(s => s.action === 'disliked');
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -132,16 +153,62 @@ export default function ProfilePage() {
               </div>
 
               <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>📌</span>
-                <span style={{ fontSize: '20px', fontWeight: '800', color: '#FFF' }}>{stats.toWatchCount}</span>
-                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Dans la Watchlist</span>
+                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>✨</span>
+                <span style={{ fontSize: '20px', fontWeight: '800', color: '#4ADE80' }}>{likedMovies.length}</span>
+                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Films validés (Swipe)</span>
               </div>
 
               <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>🏆</span>
-                <span style={{ fontSize: '20px', fontWeight: '800', color: '#FFF' }}>{stats.watchedCount}</span>
-                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Total éléments vus</span>
+                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>❌</span>
+                <span style={{ fontSize: '20px', fontWeight: '800', color: '#EF4444' }}>{dislikedMovies.length}</span>
+                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Red Flags</span>
               </div>
+            </div>
+
+            {/* SECTION HISTORIQUE DES SWIPES POTECORN PARTY */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px', padding: '20px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#EC4899', margin: 0 }}>
+                  🔥 Historique PoteCorn Party
+                </h3>
+                <a href="/potecorn-party" style={{ fontSize: '11px', color: '#C084FC', textDecoration: 'none', fontWeight: '600' }}>
+                  Lancer une session →
+                </a>
+              </div>
+
+              {swipes.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#A1A1AA', textAlign: 'center', margin: '20px 0' }}>Aucun film swipé pour l'instant.</p>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+                  {swipes.map((item) => (
+                    <div key={item.id} style={{ backgroundColor: '#18181B', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+                      <div style={{ height: '140px', backgroundColor: '#27272A', position: 'relative' }}>
+                        {item.poster_path ? (
+                          <img src={item.poster_path} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#71717A', fontSize: '10px' }}>Pas d'affiche</div>
+                        )}
+                        <span style={{ 
+                          position: 'absolute', 
+                          top: '6px', 
+                          right: '6px', 
+                          backgroundColor: item.action === 'liked' ? 'rgba(74, 222, 128, 0.9)' : 'rgba(239, 68, 68, 0.9)', 
+                          color: '#000', 
+                          padding: '2px 6px', 
+                          borderRadius: '6px', 
+                          fontSize: '9px', 
+                          fontWeight: '900' 
+                        }}>
+                          {item.action === 'liked' ? '✨' : '❌'}
+                        </span>
+                      </div>
+                      <div style={{ padding: '6px' }}>
+                        <h4 style={{ fontSize: '11px', fontWeight: '700', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* BADGES & HAUTS FAITS */}
@@ -151,7 +218,6 @@ export default function ProfilePage() {
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Badge 1 : Premier Pas */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.watchedCount >= 1 ? 1 : 0.3 }}>
                   <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🍿</div>
                   <div>
@@ -160,7 +226,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Badge 2 : Sériephile */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.tvCount >= 3 ? 1 : 0.3 }}>
                   <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>📺</div>
                   <div>
@@ -169,7 +234,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Badge 3 : Cinéphile Passionné */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.moviesCount >= 10 ? 1 : 0.3 }}>
                   <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🎬</div>
                   <div>
