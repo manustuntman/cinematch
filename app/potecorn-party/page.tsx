@@ -35,12 +35,21 @@ export default function PoteCornPartyPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    let storedId = localStorage.getItem('potecorn_uid');
-    if (!storedId) {
-      storedId = 'user_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('potecorn_uid', storedId);
-    }
-    setUserId(storedId);
+    const getAuthUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUserId(session.user.id);
+      } else {
+        // Fallback si non connecté (mode invité)
+        let storedId = localStorage.getItem('potecorn_uid');
+        if (!storedId) {
+          storedId = 'user_' + Math.random().toString(36).substr(2, 9);
+          localStorage.setItem('potecorn_uid', storedId);
+        }
+        setUserId(storedId);
+      }
+    };
+    getAuthUser();
   }, []);
 
   const fetchRandomMoviesForSwipe = async () => {
@@ -149,7 +158,7 @@ export default function PoteCornPartyPage() {
 
           if (matchData && matchData.length > 0) {
             setMatchedMovie(currentMovie);
-            setIsAddedToWatchlist(false); // Reset l'état du bouton
+            setIsAddedToWatchlist(false);
             setShowMatchModal(true);
           }
         }
@@ -175,7 +184,6 @@ export default function PoteCornPartyPage() {
     }, 300);
   };
 
-  // Fonction pour ajouter le Match à la Watchlist principale
   const addToWatchlist = async () => {
     if (!matchedMovie) return;
     try {
@@ -233,7 +241,6 @@ export default function PoteCornPartyPage() {
         .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
 
-      {/* MODAL DE MATCH MISE À JOUR AVEC BOUTON WATCHLIST */}
       {showMatchModal && matchedMovie && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div className="animate-pop-in" style={{ backgroundColor: '#18181B', border: '2px solid #EC4899', borderRadius: '24px', padding: '30px', textAlign: 'center', maxWidth: '400px', width: '100%', boxShadow: '0 0 50px rgba(236, 72, 153, 0.4)' }}>
@@ -390,8 +397,8 @@ export default function PoteCornPartyPage() {
 
             {!loadingMovies && currentMovie && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', paddingBottom: '20px', marginTop: '20px' }}>
-                <button onClick={() => handleSwipe('left')} style={{ width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '2px solid #EF4444', color: '#EF4444', fontSize: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 20 }}>❌</button>
-                <button onClick={() => handleSwipe('right')} style={{ width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '2px solid #4ADE80', color: '#4ADE80', fontSize: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 20 }}>✨</button>
+                <button onClick={() => handleSwipe('left')} style={{ width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '2px solid #EF4444', color: '#EF4444', fontSize: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: '20' }}>❌</button>
+                <button onClick={() => handleSwipe('right')} style={{ width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '2px solid #4ADE80', color: '#4ADE80', fontSize: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: '20' }}>✨</button>
               </div>
             )}
           </div>
