@@ -23,7 +23,11 @@ export default function PoteCornPartyPage() {
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [providers, setProviders] = useState<any[]>([]);
   const [showTrailer, setShowTrailer] = useState(false);
-  const [isSurpriseMovie, setIsSurpriseMovie] = useState(false); // Mode Hors Zone de Confort
+  const [isSurpriseMovie, setIsSurpriseMovie] = useState(false);
+
+  // Gestion des playlists pour l'ajout direct
+  const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
+  const [showPlaylistDrawer, setShowPlaylistDrawer] = useState(false);
 
   const [touchStartX, setTouchStartX] = useState<number>(0);
   const [touchStartY, setTouchStartY] = useState<number>(0);
@@ -35,20 +39,21 @@ export default function PoteCornPartyPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    const getAuthUser = async () => {
+    const getAuthUserAndPlaylists = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      let currentId = '';
       if (session) {
-        setUserId(session.user.id);
+        currentId = session.user.id;
       } else {
-        let storedId = localStorage.getItem('potecorn_uid');
-        if (!storedId) {
-          storedId = 'user_' + Math.random().toString(36).substr(2, 9);
-          localStorage.setItem('potecorn_uid', storedId);
-        }
-        setUserId(storedId);
+        currentId = localStorage.getItem('potecorn_uid') || 'user_anonymous';
       }
+      setUserId(currentId);
+
+      // Charger les playlists de l'utilisateur pour le menu déroulant
+      const { data: playlistsData } = await supabase.from('playlists').select('*');
+      if (playlistsData) setUserPlaylists(playlistsData);
     };
-    getAuthUser();
+    getAuthUserAndPlaylists();
   }, []);
 
   const fetchRandomMoviesForSwipe = async () => {
@@ -58,7 +63,6 @@ export default function PoteCornPartyPage() {
       const familyFilter = isFamilyMode ? '&with_genres=16,10751' : '';
       const excludedKeywords = '9714,212999,273611'; 
       
-      // 1 chance sur 5 de déclencher une pépite "Hors zone de confort" (genre inattendu comme Documentaire ou Comédie musicale)
       const surprise = Math.random() < 0.2;
       setIsSurpriseMovie(surprise);
       const surpriseFilter = surprise ? '&with_genres=99,10402,36' : '';
@@ -182,7 +186,7 @@ export default function PoteCornPartyPage() {
           }
         }
       } catch (err) {
-        console.error('Erreur sauvegarde swipe Supabase:', err);
+        console.error('Erreur sauvegarde swipe:', err);
       }
     }
 
@@ -204,26 +208,31 @@ export default function PoteCornPartyPage() {
     }, 300);
   };
 
-  const addToWatchlist = async () => {
-    if (!matchedMovie) return;
+  const addCurrentMovieToPlaylist = async (playlistId: number) => {
+    const currentMovie = swipeQueue[currentIndex];
+    if (!currentMovie) return;
+
     try {
-      await supabase.from('watchlist').insert([
+      const { error } = await supabase.from('playlist_movies').insert([
         {
-          tmdb_id: matchedMovie.id.toString(),
-          title: matchedMovie.title,
-          poster_path: matchedMovie.poster_path ? `https://image.tmdb.org/t/p/w500${matchedMovie.poster_path}` : null,
-          media_type: 'movie',
-          status: 'to_watch'
+          playlist_id: playlistId,
+          tmdb_id: currentMovie.id.toString(),
+          title: currentMovie.title,
+          poster_path: currentMovie.poster_path ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` : null
         }
       ]);
-      setIsAddedToWatchlist(true);
+
+      if (error) throw error;
+      alert('Film ajouté à la playlist avec succès ! ✨');
+      setShowPlaylistDrawer(false);
     } catch (err) {
-      console.error('Erreur ajout watchlist:', err);
+      console.error('Erreur ajout playlist:', err);
+      alert('Ce film est déjà dans cette playlist.');
     }
   };
 
   const onTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
-    if (showTrailer || showMatchModal) return;
+    if (showTrailer || showMatchModal || showPlaylistDrawer) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     setTouchStartX(clientX);
@@ -232,7 +241,7 @@ export default function PoteCornPartyPage() {
   };
 
   const onTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!isDragging || showTrailer || showMatchModal) return;
+    if (!isDragging || showTrailer || showMatchModal || showPlaylistDrawer) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     setTouchDeltaX(clientX - touchStartX);
@@ -240,7 +249,7 @@ export default function PoteCornPartyPage() {
   };
 
   const onTouchEnd = () => {
-    if (!isDragging || showTrailer || showMatchModal) return;
+    if (!isDragging || showTrailer || showMatchModal || showPlaylistDrawer) return;
     setIsDragging(false);
     if (touchDeltaY < -90) handleSwipe('up');
     else if (touchDeltaX > 90) handleSwipe('right');
@@ -270,6 +279,34 @@ export default function PoteCornPartyPage() {
         .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
 
+      {/* MODALE DE SÉLECTION DE PLAYLIST DEPUIS LA CARTE */}
+      {showPlaylistDrawer && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '24px', padding: '24px', maxWidth: '400px', width: '100%', position: 'relative' }}>
+            
+            <button onClick={() => setShowPlaylistDrawer(false)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: '#27272A', color: '#FFF', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', fontWeight: '800' }}>
+              ✕
+            </button>
+
+            <h2 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 16px 0', color: '#FFF' }}>Ajouter à une playlist</h2>
+
+            {userPlaylists.length === 0 ? (
+              <p style={{ fontSize: '13px', color: '#A1A1AA', textAlign: 'center', padding: '20px 0' }}>Aucune playlist trouvée. Créez-en une d'abord dans l'onglet Playlists !</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+                {userPlaylists.map((pl) => (
+                  <div key={pl.id} onClick={() => addCurrentMovieToPlaylist(pl.id)} style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#27272A', padding: '12px 16px', borderRadius: '12px', cursor: 'pointer' }}>
+                    <span style={{ fontSize: '20px' }}>{pl.icon || '🎬'}</span>
+                    <span style={{ fontSize: '14px', fontWeight: '800', color: '#FFF' }}>{pl.title}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODALE MATCH */}
       {showMatchModal && matchedMovie && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div className="animate-pop-in" style={{ backgroundColor: '#18181B', border: '2px solid #EC4899', borderRadius: '24px', padding: '30px', textAlign: 'center', maxWidth: '400px', width: '100%', boxShadow: '0 0 50px rgba(236, 72, 153, 0.4)' }}>
@@ -281,30 +318,9 @@ export default function PoteCornPartyPage() {
             <img src={matchedMovie.poster_path ? `https://image.tmdb.org/t/p/w500${matchedMovie.poster_path}` : ''} alt={matchedMovie.title} style={{ width: '150px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.5)' }} />
             <h3 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 20px 0' }}>{matchedMovie.title}</h3>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-              <button 
-                onClick={addToWatchlist} 
-                disabled={isAddedToWatchlist}
-                style={{ 
-                  backgroundColor: isAddedToWatchlist ? '#27272A' : '#9333EA', 
-                  color: isAddedToWatchlist ? '#A1A1AA' : '#FFF', 
-                  border: isAddedToWatchlist ? '1px solid #3F3F46' : 'none', 
-                  padding: '14px 24px', 
-                  borderRadius: '12px', 
-                  fontSize: '14px', 
-                  fontWeight: '800', 
-                  cursor: isAddedToWatchlist ? 'default' : 'pointer', 
-                  width: '100%',
-                  transition: 'all 0.3s'
-                }}
-              >
-                {isAddedToWatchlist ? '✅ Ajouté à la Watchlist' : '📌 Ajouter à notre Watchlist'}
-              </button>
-              
-              <button onClick={() => { setShowMatchModal(false); passeAuSuivant(); }} style={{ backgroundColor: 'transparent', color: '#EC4899', border: '1px solid #EC4899', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', width: '100%' }}>
-                Continuer à swiper
-              </button>
-            </div>
+            <button onClick={() => { setShowMatchModal(false); passeAuSuivant(); }} style={{ backgroundColor: '#EC4899', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', width: '100%' }}>
+              Continuer à swiper
+            </button>
           </div>
         </div>
       )}
@@ -339,8 +355,6 @@ export default function PoteCornPartyPage() {
           <div className="animate-pop-in" style={{ backgroundColor: '#18181B', borderRadius: '24px', padding: '30px', textAlign: 'center', marginTop: '30px', border: '1px solid rgba(255,255,255,0.1)' }}>
             <span style={{ fontSize: '40px', display: 'block', marginBottom: '16px' }}>🔐</span>
             <h2 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 10px 0' }}>Rejoindre un Salon</h2>
-            <p style={{ fontSize: '13px', color: '#A1A1AA', marginBottom: '20px' }}>Inventez un mot secret et tapez-le tous les deux sur vos téléphones pour vous lier.</p>
-            
             <input 
               type="text" 
               placeholder="Code secret..."
@@ -348,7 +362,6 @@ export default function PoteCornPartyPage() {
               onChange={(e) => setRoomCodeInput(e.target.value)}
               style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '16px', textAlign: 'center', marginBottom: '16px', textTransform: 'uppercase' }}
             />
-            
             <button onClick={joinRoom} style={{ width: '100%', backgroundColor: '#3B82F6', color: '#FFF', border: 'none', padding: '14px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', marginBottom: '12px' }}>
               Lancer la partie
             </button>
@@ -404,6 +417,16 @@ export default function PoteCornPartyPage() {
                       <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&controls=0`} frameBorder="0" allow="autoplay; encrypted-media" allowFullScreen style={{ pointerEvents: 'auto', backgroundColor: '#000' }} />
                     ) : (
                       <img src={currentMovie.poster_path ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` : 'https://via.placeholder.com/340x460'} alt={currentMovie.title} style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                    )}
+
+                    {/* BOUTON AJOUTER DIRECTEMENT À UNE PLAYLIST SUR LA CARTE */}
+                    {!showTrailer && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setShowPlaylistDrawer(true); }}
+                        style={{ position: 'absolute', top: '16px', left: '16px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', color: '#FFF', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', zIndex: 30, pointerEvents: 'auto' }}
+                      >
+                        📂 + Playlist
+                      </button>
                     )}
 
                     {!showTrailer && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '200px', background: 'linear-gradient(to top, rgba(24,24,27,1), rgba(24,24,27,0))', pointerEvents: 'none' }} />}
