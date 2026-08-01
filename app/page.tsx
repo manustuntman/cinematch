@@ -175,7 +175,7 @@ export default function HomePage() {
   const [selectedAversions, setSelectedAversions] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
-  const [searchQuery, setSearchQuery] = useState('');               
+  const [searchQuery, setSearchQuery] = useState('');                
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
   const [trendingMedia, setTrendingMedia] = useState<any[]>([]);
@@ -653,7 +653,10 @@ export default function HomePage() {
             <div></div>
           )}
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <a href="/potecorn-party" style={{ color: '#EC4899', fontSize: '12px', fontWeight: '700', textDecoration: 'none', backgroundColor: 'rgba(236, 72, 153, 0.15)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(236, 72, 153, 0.4)' }}>
+              🔥 PoteCorn Party
+            </a>
             <a href="/playlists" style={{ color: '#FBBF24', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(251, 191, 36, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
               🎵 Playlists
             </a>
