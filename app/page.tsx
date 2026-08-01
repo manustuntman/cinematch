@@ -23,6 +23,14 @@ const GENRES_LIST_TV = [
   { id: 9648, name: 'Mystère 🕵️' },
 ];
 
+const STREAMING_PROVIDERS = [
+  { id: 8, name: 'Netflix 🔴' },
+  { id: 119, name: 'Prime Video 🔵' },
+  { id: 337, name: 'Disney+ ✨' },
+  { id: 381, name: 'Canal+ 📺' },
+  { id: 350, name: 'Apple TV 🍏' },
+];
+
 const AVERSIONS_LIST = [
   { id: 10683, keyword: '10683,235336', name: '🚫 Huis clos / Espaces clos' },
   { id: 3047, keyword: '3047,12615', name: '🕷️ Araignées' },
@@ -33,7 +41,7 @@ const AVERSIONS_LIST = [
 
 const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩‍👦', 'Coup de cœur ❤️', 'À revoir 🔄'];
 
-function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void }) {
+function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void; currentUserId: string }) {
   const [cast, setCast] = useState<any[]>([]);
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -50,15 +58,17 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
           setCast(data.cast.slice(0, 2));
         }
 
-        const { data: plData } = await supabase.from('playlists').select('*');
-        if (isMounted && plData) setPlaylists(plData);
+        if (currentUserId) {
+          const { data: plData } = await supabase.from('playlists').select('*').eq('user_id', currentUserId);
+          if (isMounted && plData) setPlaylists(plData);
+        }
       } catch (err) {
         console.error(err);
       }
     };
     fetchCastAndPlaylists();
     return () => { isMounted = false; };
-  }, [item.id, mediaType]);
+  }, [item.id, mediaType, currentUserId]);
 
   const handleAdd = async (e: React.MouseEvent, playlistId: string) => {
     e.stopPropagation();
@@ -112,7 +122,6 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
             ★ {item.vote_average?.toFixed(1)}
           </span>
 
-          {/* BOUTON D'AJOUT RAPIDE AUX PLAYLISTS 📂 + */}
           <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}>
             <button 
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowDropdown(!showDropdown); }}
@@ -170,8 +179,15 @@ function MediaCardXRay({ item, mediaType, onOpen }: { item: any; mediaType: 'mov
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
+  
+  // Auth & XP
+  const [user, setUser] = useState<any>(null);
+  const [userLevel, setUserLevel] = useState<number>(1);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+
   const [mediaType, setMediaType] = useState<'movie' | 'tv'>('movie'); 
   const [preferences, setPreferences] = useState<number[]>([]);
+  const [selectedProviders, setSelectedProviders] = useState<number[]>([]);
   const [selectedAversions, setSelectedAversions] = useState<number[]>([]);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   
@@ -219,11 +235,39 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    
+    const initUserAndData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      let uid = '';
+
+      if (session) {
+        setUser(session.user);
+        uid = session.user.id;
+      } else {
+        uid = localStorage.getItem('potecorn_uid') || '';
+      }
+      
+      setCurrentUserId(uid);
+
+      if (uid) {
+        // Calcul du niveau (XP) basé sur les likes
+        const { data: likes } = await supabase.from('user_swipes').select('id').eq('user_uid', uid).eq('action', 'liked');
+        const likesCount = likes ? likes.length : 0;
+        
+        const { data: profileData } = await supabase.from('profiles').select('xp').eq('id', uid).single();
+        const xp = (profileData?.xp && profileData.xp > 0) ? profileData.xp : (likesCount * 50);
+        setUserLevel(Math.floor(xp / 500) + 1);
+      }
+    };
+
+    initUserAndData();
+    fetchTrending();
+  }, [mediaType]);
 
   const fetchUserPlaylists = async () => {
+    if (!currentUserId) return;
     try {
-      const { data } = await supabase.from('playlists').select('*');
+      const { data } = await supabase.from('playlists').select('*').eq('user_id', currentUserId);
       if (data) setUserPlaylists(data);
     } catch (err) {
       console.error(err);
@@ -278,7 +322,9 @@ export default function HomePage() {
       const excluded = getExcludedKeywordsString();
       const excludeParam = excluded ? `&without_keywords=${excluded}` : '';
       
-      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc${excludeParam}&page=1`;
+      const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
+      
+      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc${excludeParam}${providersQuery}&page=1`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -359,8 +405,9 @@ export default function HomePage() {
       const genreParam = preferences.length > 0 ? `&with_genres=${preferences.join(',')}` : '';
       const excluded = getExcludedKeywordsString();
       const excludeParam = excluded ? `&without_keywords=${excluded}` : '';
+      const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
       
-      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc${genreParam}${excludeParam}&page=${Math.floor(Math.random() * 5) + 1}`;
+      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc${genreParam}${excludeParam}${providersQuery}&page=${Math.floor(Math.random() * 5) + 1}`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -465,6 +512,12 @@ export default function HomePage() {
 
   const saveToSupabaseWithNotebook = async (status: 'to_watch' | 'watched') => {
     if (!selectedMediaDetail) return;
+    if (!currentUserId) {
+      setFeedback('⚠️ Connectez-vous ou créez un profil pour sauvegarder !');
+      setTimeout(() => setFeedback(null), 3000);
+      return;
+    }
+
     setFeedback(null);
     const title = selectedMediaDetail.title || selectedMediaDetail.name;
     const movieIdStr = selectedMediaDetail.id.toString();
@@ -473,7 +526,8 @@ export default function HomePage() {
       const { data: existing, error: checkError } = await supabase
         .from('watchlist')
         .select('id')
-        .eq('movie_id', movieIdStr);
+        .eq('movie_id', movieIdStr)
+        .eq('user_id', currentUserId);
 
       if (checkError) throw checkError;
 
@@ -486,6 +540,7 @@ export default function HomePage() {
 
       const { error } = await supabase.from('watchlist').insert([
         {
+          user_id: currentUserId,
           movie_id: movieIdStr,
           title: title,
           poster_path: selectedMediaDetail.poster_path ? `https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}` : selectedMediaDetail.poster,
@@ -531,12 +586,6 @@ export default function HomePage() {
     setTimeout(() => setFeedback(null), 3000);
   };
 
-  useEffect(() => {
-    if (isMounted) {
-      fetchTrending();
-    }
-  }, [mediaType, isMounted]);
-
   if (!isMounted) {
     return null;
   }
@@ -544,7 +593,7 @@ export default function HomePage() {
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
 
   return (
-    <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', margin: 0, padding: '0 16px 24px 16px', overflowX: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
+    <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', margin: 0, padding: '0 16px 90px 16px', overflowX: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
       
       <style jsx global>{`
         @keyframes scrollMarquee {
@@ -563,7 +612,7 @@ export default function HomePage() {
 
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
-        {/* HEADER */}
+        {/* HEADER AVEC NIVEAU XP DYNAMIQUE */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', marginBottom: '16px' }}>
           <div>
             <img 
@@ -588,7 +637,7 @@ export default function HomePage() {
             }}
           >
             <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold' }}>👤</div>
-            <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>Profil / XP</span>
+            <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>Niv. {userLevel} ✨</span>
           </a>
         </header>
 
@@ -631,9 +680,9 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* NAVIGATION SECONDAIRE */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          {isSetupComplete ? (
+        {/* BOUTON RESET FILTRES */}
+        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: '16px' }}>
+          {isSetupComplete && (
             <button
               onClick={() => setIsSetupComplete(false)}
               style={{
@@ -649,25 +698,11 @@ export default function HomePage() {
             >
               ← 🏠 Modifier les filtres
             </button>
-          ) : (
-            <div></div>
           )}
-
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <a href="/potecorn-party" style={{ color: '#EC4899', fontSize: '12px', fontWeight: '700', textDecoration: 'none', backgroundColor: 'rgba(236, 72, 153, 0.15)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(236, 72, 153, 0.4)' }}>
-              🔥 PoteCorn Party
-            </a>
-            <a href="/playlists" style={{ color: '#FBBF24', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(251, 191, 36, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
-              🎵 Playlists
-            </a>
-            <a href="/watchlist" style={{ color: '#C084FC', fontSize: '12px', fontWeight: '600', textDecoration: 'none', backgroundColor: 'rgba(192, 132, 252, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(192, 132, 252, 0.2)' }}>
-              📌 Watchlist
-            </a>
-          </div>
         </div>
 
         {feedback && (
-          <div style={{ position: 'fixed', bottom: '20px', right: '20px', backgroundColor: '#9333EA', color: '#FFF', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', zIndex: 2000, maxWidth: '350px' }}>
+          <div style={{ position: 'fixed', bottom: '100px', right: '20px', backgroundColor: '#9333EA', color: '#FFF', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', zIndex: 2000, maxWidth: '350px' }}>
             {feedback}
           </div>
         )}
@@ -788,12 +823,12 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* QUESTIONNAIRE PRINCIPAL */}
+        {/* QUESTIONNAIRE PRINCIPAL COMPLET (AVEC PLATEFORMES) */}
         {!isSetupComplete ? (
           <div>
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '24px' }}>
               
-              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 1 sur 3</span>
+              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 1 sur 4</span>
               <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>Que veux-tu regarder aujourd'hui ? 🍿</h2>
               
               <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '24px' }}>
@@ -831,7 +866,7 @@ export default function HomePage() {
                 </button>
               </div>
 
-              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 2 sur 3</span>
+              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 2 sur 4</span>
               <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>Tes genres préférés :</h3>
               
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
@@ -861,7 +896,39 @@ export default function HomePage() {
                 })}
               </div>
 
-              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#EF4444', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 3 sur 3 (Optionnel)</span>
+              {/* NOUVELLE ÉTAPE : PLATEFORMES DE STREAMING */}
+              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#60A5FA', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 3 sur 4 (Optionnel)</span>
+              <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: '#93C5FD' }}>Quels abonnements as-tu ?</h3>
+              <p style={{ fontSize: '11px', color: '#A1A1AA', marginBottom: '12px' }}>Sélectionne tes plateformes pour filtrer les résultats.</p>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
+                {STREAMING_PROVIDERS.map((prov) => {
+                  const selected = selectedProviders.includes(prov.id);
+                  return (
+                    <button
+                      key={prov.id}
+                      onClick={() => {
+                        if (selected) setSelectedProviders(selectedProviders.filter(id => id !== prov.id));
+                        else setSelectedProviders([...selectedProviders, prov.id]);
+                      }}
+                      style={{
+                        backgroundColor: selected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                        border: selected ? '1px solid #3B82F6' : '1px solid rgba(255, 255, 255, 0.08)',
+                        color: selected ? '#93C5FD' : '#A1A1AA',
+                        padding: '6px 12px',
+                        borderRadius: '16px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {prov.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#EF4444', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 4 sur 4 (Optionnel)</span>
               <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: '#F87171' }}>Écarter ce que tu N'AIMES PAS :</h3>
               <p style={{ fontSize: '11px', color: '#A1A1AA', marginBottom: '12px' }}>Sélectionne tes phobies ou éléments à exclure.</p>
 
@@ -993,7 +1060,7 @@ export default function HomePage() {
               </h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {trendingMedia.map((item) => (
-                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} />
+                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} />
                 ))}
               </div>
             </div>
@@ -1004,25 +1071,10 @@ export default function HomePage() {
               <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#C084FC' }}>
                 🎯 Sélection pour toi
               </h2>
-              <button 
-                onClick={() => setIsSetupComplete(false)} 
-                style={{ 
-                  backgroundColor: 'rgba(255,255,255,0.08)', 
-                  color: '#FFF', 
-                  border: '1px solid rgba(255, 255, 255, 0.15)', 
-                  padding: '6px 12px', 
-                  borderRadius: '12px', 
-                  fontSize: '11px', 
-                  fontWeight: '600',
-                  cursor: 'pointer' 
-                }}
-              >
-                ✏️ Réinitialiser / Modifier
-              </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
               {recommendedMedia.map((item) => (
-                <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} />
+                <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} />
               ))}
             </div>
           </div>
@@ -1316,6 +1368,35 @@ export default function HomePage() {
         )}
 
       </div>
+
+      {/* BARRE DE NAVIGATION MOBILE (BOTTOM BAR) */}
+      <nav style={{ 
+        position: 'fixed', 
+        bottom: 0, 
+        left: 0, 
+        right: 0, 
+        backgroundColor: 'rgba(24, 24, 27, 0.95)', 
+        borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
+        display: 'flex', 
+        justifyContent: 'space-around', 
+        padding: '12px 0 24px 0', 
+        zIndex: 1000, 
+        backdropFilter: 'blur(10px)' 
+      }}>
+        <a href="/" style={{ color: '#9333EA', textDecoration: 'none', textAlign: 'center', fontSize: '20px' }}>
+          🏠<span style={{ display: 'block', fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Accueil</span>
+        </a>
+        <a href="/potecorn-party" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '20px' }}>
+          🔥<span style={{ display: 'block', fontSize: '10px', marginTop: '4px' }}>Party</span>
+        </a>
+        <a href="/playlists" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '20px' }}>
+          🎵<span style={{ display: 'block', fontSize: '10px', marginTop: '4px' }}>Playlists</span>
+        </a>
+        <a href="/profile" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '20px' }}>
+          👤<span style={{ display: 'block', fontSize: '10px', marginTop: '4px' }}>Profil</span>
+        </a>
+      </nav>
+
     </main>
   );
 }
