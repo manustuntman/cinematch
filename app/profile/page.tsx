@@ -176,38 +176,22 @@ export default function ProfilePage() {
     setSwipes([]);
   };
 
-  // Fonction pour Uploader l'image sur Supabase Storage
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      if (!e.target.files || e.target.files.length === 0 || !user) return;
-      setUploadingImage(true);
+  // Convertir l'image locale directement en texte (Base64)
+  const handleImageConversion = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      // 1. Upload vers le bucket "avatars"
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // 2. Récupérer l'URL publique de l'image
-      const { data } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      if (data && data.publicUrl) {
-        setAvatarUrl(data.publicUrl);
-      }
-    } catch (err) {
-      console.error('Erreur upload image:', err);
-      alert("Erreur lors de l'envoi de l'image.");
-    } finally {
+    setUploadingImage(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarUrl(reader.result as string); // Stocke l'image sous forme de texte brut
       setUploadingImage(false);
-    }
+    };
+    reader.onerror = () => {
+      alert("Erreur lors de la lecture de l'image.");
+      setUploadingImage(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -365,7 +349,7 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              {/* FORMULAIRE DE MODIFICATION AVEC UPLOAD DE FICHIER */}
+              {/* FORMULAIRE DE MODIFICATION */}
               {isEditing && (
                 <form onSubmit={handleSaveProfile} style={{ marginTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.15)', paddingTop: '20px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', marginBottom: '12px' }}>Mettre à jour mes informations</h3>
@@ -376,14 +360,14 @@ export default function ProfilePage() {
                   </div>
 
                   <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Photo de profil (Uploader une image)</label>
+                    <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Choisir une photo de profil</label>
                     <input 
                       type="file" 
                       accept="image/*" 
-                      onChange={handleFileUpload} 
+                      onChange={handleImageConversion} 
                       style={{ width: '100%', padding: '8px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '12px', boxSizing: 'border-box', cursor: 'pointer' }} 
                     />
-                    {uploadingImage && <span style={{ fontSize: '11px', color: '#C084FC', marginTop: '4px', display: 'block' }}>Envoi de l'image en cours...</span>}
+                    {uploadingImage && <span style={{ fontSize: '11px', color: '#C084FC', marginTop: '4px', display: 'block' }}>Conversion de l'image...</span>}
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
