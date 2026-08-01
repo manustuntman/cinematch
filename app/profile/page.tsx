@@ -13,12 +13,13 @@ export default function ProfilePage() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // Mode Édition du profil
+  // Mode Édition
   const [isEditing, setIsEditing] = useState(false);
 
   // Profil
   const [username, setUsername] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('');
   const [country, setCountry] = useState('');
@@ -26,7 +27,7 @@ export default function ProfilePage() {
   const [isPublic, setIsPublic] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // Amis (Recherche par pseudo)
+  // Amis
   const [friends, setFriends] = useState<any[]>([]);
   const [friendPseudoInput, setFriendPseudoInput] = useState('');
   const [friendError, setFriendError] = useState('');
@@ -73,7 +74,6 @@ export default function ProfilePage() {
   const fetchUserData = async (userId: string) => {
     setLoading(true);
     try {
-      // 1. Profil
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -90,7 +90,6 @@ export default function ProfilePage() {
         setIsPublic(profileData.is_public ?? true);
       }
 
-      // 2. Watchlist & XP
       const { data: watchlistData } = await supabase.from('watchlist').select('*');
       if (watchlistData) {
         const watched = watchlistData.filter((item) => item.status === 'watched');
@@ -117,7 +116,6 @@ export default function ProfilePage() {
         });
       }
 
-      // 3. Swipes
       const { data: swipesData } = await supabase
         .from('user_swipes')
         .select('*')
@@ -126,7 +124,6 @@ export default function ProfilePage() {
 
       if (swipesData) setSwipes(swipesData);
 
-      // 4. Amis
       const { data: friendshipsData } = await supabase
         .from('friendships')
         .select('*')
@@ -134,7 +131,6 @@ export default function ProfilePage() {
         .eq('status', 'accepted');
 
       if (friendshipsData) {
-        // Récupérer les détails des profils des amis pour afficher leurs vrais pseudos
         const friendIds = friendshipsData.map(f => f.user_id === userId ? f.friend_id : f.user_id);
         if (friendIds.length > 0) {
           const { data: friendProfiles } = await supabase
@@ -180,6 +176,40 @@ export default function ProfilePage() {
     setSwipes([]);
   };
 
+  // Fonction pour Uploader l'image sur Supabase Storage
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      if (!e.target.files || e.target.files.length === 0 || !user) return;
+      setUploadingImage(true);
+
+      const file = e.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // 1. Upload vers le bucket "avatars"
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // 2. Récupérer l'URL publique de l'image
+      const { data } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      if (data && data.publicUrl) {
+        setAvatarUrl(data.publicUrl);
+      }
+    } catch (err) {
+      console.error('Erreur upload image:', err);
+      alert("Erreur lors de l'envoi de l'image.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -201,7 +231,7 @@ export default function ProfilePage() {
       const { error } = await supabase.from('profiles').upsert(updates);
       if (error) throw error;
       alert('Profil mis à jour avec succès ! ✨');
-      setIsEditing(false); // Ferme le mode édition après enregistrement
+      setIsEditing(false);
     } catch (err) {
       console.error('Erreur sauvegarde profil:', err);
       alert('Erreur lors de la sauvegarde.');
@@ -209,14 +239,12 @@ export default function ProfilePage() {
     setSavingProfile(false);
   };
 
-  // Ajouter un ami par son PSEUDO
   const addFriendByPseudo = async (e: React.FormEvent) => {
     e.preventDefault();
     setFriendError('');
     if (!friendPseudoInput.trim() || !user) return;
 
     try {
-      // 1. Chercher le profil par son username
       const { data: targetProfile, error: searchError } = await supabase
         .from('profiles')
         .select('id, username')
@@ -233,7 +261,6 @@ export default function ProfilePage() {
         return;
       }
 
-      // 2. Insérer l'amitié
       const { error: insertError } = await supabase.from('friendships').insert([
         {
           user_id: user.id,
@@ -273,7 +300,6 @@ export default function ProfilePage() {
         {loading ? (
           <p style={{ textAlign: 'center', color: '#A1A1AA', padding: '40px 0' }}>Chargement...</p>
         ) : !user ? (
-          /* CONNEXION / INSCRIPTION */
           <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '30px', marginTop: '40px', textAlign: 'center' }}>
             <span style={{ fontSize: '40px', display: 'block', marginBottom: '16px' }}>🔐</span>
             <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 8px 0' }}>{isSignUp ? 'Créer un compte' : 'Connexion'}</h2>
@@ -303,7 +329,6 @@ export default function ProfilePage() {
             </button>
           </div>
         ) : (
-          /* PROFIL CONNECTÉ (CARTE D'IDENTITÉ & STRUCTURE) */
           <div>
             
             {/* CARTE D'IDENTITÉ DU PROFIL */}
@@ -331,7 +356,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* BOUTONS ACTIONS (MODIFIER & DÉCO) */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
                 <button onClick={() => setIsEditing(!isEditing)} style={{ backgroundColor: 'rgba(192, 132, 252, 0.1)', color: '#C084FC', border: '1px solid rgba(192, 132, 252, 0.3)', padding: '6px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
                   {isEditing ? 'Fermer' : '✏️ Modifier mon profil'}
@@ -341,19 +365,25 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              {/* FORMULAIRE DE MODIFICATION (VISIBLE UNIQUEMENT SI IS_EDITING = TRUE) */}
+              {/* FORMULAIRE DE MODIFICATION AVEC UPLOAD DE FICHIER */}
               {isEditing && (
                 <form onSubmit={handleSaveProfile} style={{ marginTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.15)', paddingTop: '20px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', marginBottom: '12px' }}>Mettre à jour mes informations</h3>
                   
-                  <div style={{ marginBottom: '10px' }}>
+                  <div style={{ marginBottom: '12px' }}>
                     <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Pseudo</label>
                     <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
                   </div>
 
-                  <div style={{ marginBottom: '10px' }}>
-                    <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>URL de l'Avatar</label>
-                    <input type="url" placeholder="https://..." value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Photo de profil (Uploader une image)</label>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleFileUpload} 
+                      style={{ width: '100%', padding: '8px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '12px', boxSizing: 'border-box', cursor: 'pointer' }} 
+                    />
+                    {uploadingImage && <span style={{ fontSize: '11px', color: '#C084FC', marginTop: '4px', display: 'block' }}>Envoi de l'image en cours...</span>}
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
@@ -383,14 +413,14 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  <button type="submit" disabled={savingProfile} style={{ width: '100%', backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}>
+                  <button type="submit" disabled={savingProfile || uploadingImage} style={{ width: '100%', backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}>
                     {savingProfile ? 'Enregistrement...' : 'Enregistrer'}
                   </button>
                 </form>
               )}
             </div>
 
-            {/* BANDEAU AMIS & DUO (PAR PSEUDO) */}
+            {/* BANDEAU AMIS & DUO */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '24px', padding: '20px', marginBottom: '24px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#3B82F6', margin: '0 0 10px 0' }}>👥 Mes Amis & Duo</h3>
 
