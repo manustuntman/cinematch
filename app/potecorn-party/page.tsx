@@ -13,6 +13,7 @@ export default function PoteCornPartyPage() {
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchedMovie, setMatchedMovie] = useState<any>(null);
+  const [isAddedToWatchlist, setIsAddedToWatchlist] = useState(false);
 
   const [swipeQueue, setSwipeQueue] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -47,11 +48,7 @@ export default function PoteCornPartyPage() {
     try {
       const randomPage = Math.floor(Math.random() * 20) + 1;
       const familyFilter = isFamilyMode ? '&with_genres=16,10751' : '';
-      
-      // NOUVEAU : Filtre intelligent Anti-Red Flags
-      // On exclut les mots-clés TMDB liés aux espaces confinés (ex: 9714 pour claustrophobia, 212999 pour one room)
       const excludedKeywords = '9714,212999,273611'; 
-      
       const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc&page=${randomPage}${familyFilter}&without_keywords=${excludedKeywords}`;
       
       const res = await fetch(url);
@@ -152,6 +149,7 @@ export default function PoteCornPartyPage() {
 
           if (matchData && matchData.length > 0) {
             setMatchedMovie(currentMovie);
+            setIsAddedToWatchlist(false); // Reset l'état du bouton
             setShowMatchModal(true);
           }
         }
@@ -175,6 +173,25 @@ export default function PoteCornPartyPage() {
         fetchRandomMoviesForSwipe();
       }
     }, 300);
+  };
+
+  // Fonction pour ajouter le Match à la Watchlist principale
+  const addToWatchlist = async () => {
+    if (!matchedMovie) return;
+    try {
+      await supabase.from('watchlist').insert([
+        {
+          tmdb_id: matchedMovie.id.toString(),
+          title: matchedMovie.title,
+          poster_path: matchedMovie.poster_path ? `https://image.tmdb.org/t/p/w500${matchedMovie.poster_path}` : null,
+          media_type: 'movie',
+          status: 'to_watch'
+        }
+      ]);
+      setIsAddedToWatchlist(true);
+    } catch (err) {
+      console.error('Erreur ajout watchlist:', err);
+    }
   };
 
   const onTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
@@ -216,6 +233,7 @@ export default function PoteCornPartyPage() {
         .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
 
+      {/* MODAL DE MATCH MISE À JOUR AVEC BOUTON WATCHLIST */}
       {showMatchModal && matchedMovie && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div className="animate-pop-in" style={{ backgroundColor: '#18181B', border: '2px solid #EC4899', borderRadius: '24px', padding: '30px', textAlign: 'center', maxWidth: '400px', width: '100%', boxShadow: '0 0 50px rgba(236, 72, 153, 0.4)' }}>
@@ -226,9 +244,31 @@ export default function PoteCornPartyPage() {
             <p style={{ color: '#D4D4D8', marginBottom: '20px' }}>Vous avez tous les deux validé :</p>
             <img src={matchedMovie.poster_path ? `https://image.tmdb.org/t/p/w500${matchedMovie.poster_path}` : ''} alt={matchedMovie.title} style={{ width: '150px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.5)' }} />
             <h3 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 20px 0' }}>{matchedMovie.title}</h3>
-            <button onClick={() => { setShowMatchModal(false); passeAuSuivant(); }} style={{ backgroundColor: '#EC4899', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', width: '100%' }}>
-              Continuer à swiper
-            </button>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+              <button 
+                onClick={addToWatchlist} 
+                disabled={isAddedToWatchlist}
+                style={{ 
+                  backgroundColor: isAddedToWatchlist ? '#27272A' : '#9333EA', 
+                  color: isAddedToWatchlist ? '#A1A1AA' : '#FFF', 
+                  border: isAddedToWatchlist ? '1px solid #3F3F46' : 'none', 
+                  padding: '14px 24px', 
+                  borderRadius: '12px', 
+                  fontSize: '14px', 
+                  fontWeight: '800', 
+                  cursor: isAddedToWatchlist ? 'default' : 'pointer', 
+                  width: '100%',
+                  transition: 'all 0.3s'
+                }}
+              >
+                {isAddedToWatchlist ? '✅ Ajouté à la Watchlist' : '📌 Ajouter à notre Watchlist'}
+              </button>
+              
+              <button onClick={() => { setShowMatchModal(false); passeAuSuivant(); }} style={{ backgroundColor: 'transparent', color: '#EC4899', border: '1px solid #EC4899', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', width: '100%' }}>
+                Continuer à swiper
+              </button>
+            </div>
           </div>
         </div>
       )}
