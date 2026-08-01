@@ -8,7 +8,6 @@ export default function PoteCornPartyPage() {
   const [mode, setMode] = useState<'menu' | 'solo' | 'duo_setup' | 'duo'>('menu');
   const [userId, setUserId] = useState<string>('');
   
-  // Gestion du Mode Duo
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const [showMatchModal, setShowMatchModal] = useState(false);
@@ -20,13 +19,12 @@ export default function PoteCornPartyPage() {
   const [loadingMovies, setLoadingMovies] = useState(false);
   const [animatingDir, setAnimatingDir] = useState<'left' | 'right' | 'up' | null>(null);
 
-  // Fonctionnalités précédentes
   const [isFamilyMode, setIsFamilyMode] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [providers, setProviders] = useState<any[]>([]);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [isSurpriseMovie, setIsSurpriseMovie] = useState(false); // Mode Hors Zone de Confort
 
-  // Variables tactile
   const [touchStartX, setTouchStartX] = useState<number>(0);
   const [touchStartY, setTouchStartY] = useState<number>(0);
   const [touchDeltaX, setTouchDeltaX] = useState<number>(0);
@@ -59,7 +57,13 @@ export default function PoteCornPartyPage() {
       const randomPage = Math.floor(Math.random() * 20) + 1;
       const familyFilter = isFamilyMode ? '&with_genres=16,10751' : '';
       const excludedKeywords = '9714,212999,273611'; 
-      const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc&page=${randomPage}${familyFilter}&without_keywords=${excludedKeywords}`;
+      
+      // 1 chance sur 5 de déclencher une pépite "Hors zone de confort" (genre inattendu comme Documentaire ou Comédie musicale)
+      const surprise = Math.random() < 0.2;
+      setIsSurpriseMovie(surprise);
+      const surpriseFilter = surprise ? '&with_genres=99,10402,36' : '';
+
+      const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc&page=${randomPage}${familyFilter}${surpriseFilter}&without_keywords=${excludedKeywords}`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -139,8 +143,6 @@ export default function PoteCornPartyPage() {
       if (direction === 'up') actionType = 'skipped';
       
       try {
-        // Extraction textuelle des genres TMDB (ex: IDs convertis ou récupérés)
-        // On associe les IDs de genres courants TMDB pour l'exemple si on a le tableau genre_ids
         const genreMap: { [key: number]: string } = {
           28: 'Action', 12: 'Aventure', 16: 'Animation', 35: 'Comédie', 80: 'Crime',
           99: 'Documentaire', 18: 'Drame', 10751: 'Famille', 14: 'Fantastique', 36: 'Histoire',
@@ -160,7 +162,7 @@ export default function PoteCornPartyPage() {
             poster_path: currentMovie.poster_path ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` : null,
             action: actionType,
             room_code: activeRoom || null,
-            genres: movieGenres // Enregistrement automatique des genres pour le Panthéon !
+            genres: movieGenres
           }
         ]);
 
@@ -337,7 +339,7 @@ export default function PoteCornPartyPage() {
           <div className="animate-pop-in" style={{ backgroundColor: '#18181B', borderRadius: '24px', padding: '30px', textAlign: 'center', marginTop: '30px', border: '1px solid rgba(255,255,255,0.1)' }}>
             <span style={{ fontSize: '40px', display: 'block', marginBottom: '16px' }}>🔐</span>
             <h2 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 10px 0' }}>Rejoindre un Salon</h2>
-            <p style={{ fontSize: '13px', color: '#A1A1AA', marginBottom: '20px' }}>Inventez un mot secret (ex: FILM2026) et tapez-le tous les deux sur vos téléphones pour vous lier.</p>
+            <p style={{ fontSize: '13px', color: '#A1A1AA', marginBottom: '20px' }}>Inventez un mot secret et tapez-le tous les deux sur vos téléphones pour vous lier.</p>
             
             <input 
               type="text" 
@@ -364,9 +366,16 @@ export default function PoteCornPartyPage() {
                 ← Quitter
               </button>
               
-              <button onClick={() => setIsFamilyMode(!isFamilyMode)} style={{ backgroundColor: isFamilyMode ? '#4ADE80' : 'rgba(255,255,255,0.1)', color: isFamilyMode ? '#000' : '#FFF', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {isFamilyMode ? '🧸 Mode Famille ON' : '🧸 Mode Famille'}
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {isSurpriseMovie && (
+                  <span style={{ backgroundColor: '#F59E0B', color: '#000', padding: '4px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: '900' }}>
+                    🚀 Hors Zone de Confort !
+                  </span>
+                )}
+                <button onClick={() => setIsFamilyMode(!isFamilyMode)} style={{ backgroundColor: isFamilyMode ? '#4ADE80' : 'rgba(255,255,255,0.1)', color: isFamilyMode ? '#000' : '#FFF', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                  {isFamilyMode ? '🧸 Famille ON' : '🧸 Famille'}
+                </button>
+              </div>
             </div>
 
             <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '460px', overflow: 'hidden' }}>
@@ -386,9 +395,9 @@ export default function PoteCornPartyPage() {
                     zIndex: 10
                   }}
                 >
-                  {touchDeltaX > 20 && <div style={{ position: 'absolute', top: '30px', left: '20px', zIndex: 20, border: '4px solid #4ADE80', color: '#4ADE80', padding: '8px 16px', borderRadius: '12px', fontSize: '20px', fontWeight: '900', transform: 'rotate(-15deg)', backgroundColor: 'rgba(0,0,0,0.7)', opacity: Math.min(touchDeltaX / 80, 1) }}>✨ JE VALIDE</div>}
+                  {touchDeltaX > 20 && <div style={{ position: 'absolute', top: '30px', left: '20px', zIndex: 20, border: '4px solid #4ADE80', color: '#4ADE80', padding: '8px 16px', borderRadius: '12px', fontSize: '20px', fontWeight: '900', transform: 'rotate(-15deg)', backgroundColor: 'rgba(0,0,0,0.7)', opacity: Math.min(touchDeltaX / 80, 1) }}>✨ VALIDE</div>}
                   {touchDeltaX < -20 && <div style={{ position: 'absolute', top: '30px', right: '20px', zIndex: 20, border: '4px solid #EF4444', color: '#EF4444', padding: '8px 16px', borderRadius: '12px', fontSize: '20px', fontWeight: '900', transform: 'rotate(15deg)', backgroundColor: 'rgba(0,0,0,0.7)', opacity: Math.min(Math.abs(touchDeltaX) / 80, 1) }}>❌ RED FLAG</div>}
-                  {touchDeltaY < -20 && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 20, border: '4px solid #3B82F6', color: '#3B82F6', padding: '8px 16px', borderRadius: '12px', fontSize: '20px', fontWeight: '900', backgroundColor: 'rgba(0,0,0,0.8)', opacity: Math.min(Math.abs(touchDeltaY) / 80, 1) }}>⏭️ PAS CONNU</div>}
+                  {touchDeltaY < -20 && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 20, border: '4px solid #3B82F6', color: '#3B82F6', padding: '8px 16px', borderRadius: '12px', fontSize: '20px', fontWeight: '900', backgroundColor: 'rgba(0,0,0,0.8)', opacity: Math.min(Math.abs(touchDeltaY) / 80, 1) }}>⏭️ PAS VU</div>}
 
                   <div style={{ position: 'relative', height: '460px' }}>
                     {showTrailer && trailerKey ? (
