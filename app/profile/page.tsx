@@ -44,7 +44,7 @@ export default function ProfilePage() {
           setProfile(profileData);
         }
 
-        // 2. Charger les swipes pour le Panthéon, les Likes et les Genres favoris
+        // 2. Charger les swipes pour le Panthéon & XP
         const { data: swipesData } = await supabase
           .from('user_swipes')
           .select('*')
@@ -146,14 +146,13 @@ export default function ProfilePage() {
     setSaving(false);
   };
 
-  // Calcul du niveau d'XP et des badges
   const userXp = profile.xp || (likedMoviesCount * 50);
   const userLevel = Math.floor(userXp / 500) + 1;
 
   if (!isMounted) return null;
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', paddingBottom: '80px' }}>
+    <main style={{ minHeight: '100vh', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         
         {/* EN-TÊTE */}
@@ -167,7 +166,7 @@ export default function ProfilePage() {
           <div style={{ width: '60px' }}></div>
         </div>
 
-        {/* PANTHÉON & STATISTIQUES (XP & NIVEAU) */}
+        {/* PANTHÉON & STATISTIQUES */}
         <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(147, 51, 234, 0.4)', borderRadius: '24px', padding: '20px', marginBottom: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -207,7 +206,7 @@ export default function ProfilePage() {
         </div>
 
         {/* FORMULAIRE DE PROFIL D'ORIGINE */}
-        <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '24px', marginBottom: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+        <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '24px', marginBottom: '30px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
           <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
             <div>
