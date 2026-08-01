@@ -179,11 +179,14 @@ export default function ProfilePage() {
 
       // 4. Succès Secrets (Vérification et déblocage automatique)
       const currentHour = new Date().getHours();
+      const hasSwipes = Boolean(swipesData && swipesData.length > 0);
+      const likedCount = swipesData ? swipesData.filter((s: any) => s.action === 'liked').length : 0;
+
       const achievementsToCheck: { [key: string]: boolean } = {
-        'premier_pas': watchedCountVal >= 1 || (swipesData && swipesData.length > 0),
-        'noctambule': currentHour >= 2 && currentHour <= 5, // Connecté entre 2h et 5h du mat
+        'premier_pas': watchedCountVal >= 1 || hasSwipes,
+        'noctambule': currentHour >= 2 && currentHour <= 5,
         'cinéphile_assidu': moviesWatchedVal >= 10,
-        'explorateur': swipesData && swipesData.filter((s: any) => s.action === 'liked').length >= 5,
+        'explorateur': likedCount >= 5,
       };
 
       // Charger les succès déjà en base
@@ -234,9 +237,9 @@ export default function ProfilePage() {
               const commonMovies = friendLikedIds.filter(id => userLikedIds.includes(id));
               const totalUnique = new Set([...userLikedIds, ...friendLikedIds]).size;
               const score = Math.round((commonMovies.length / totalUnique) * 100);
-              compatMap[fId] = Math.max(score, 15); // Minimum 15% pour le fun
+              compatMap[fId] = Math.max(score, 15);
             } else {
-              compatMap[fId] = 50; // Valeur par défaut si pas assez de data commune
+              compatMap[fId] = 50;
             }
           }
           setFriendCompatibilities(compatMap);
