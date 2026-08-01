@@ -135,20 +135,16 @@ export default function ProfilePage() {
 
         const likedItems = swipesData.filter((s: any) => s.action === 'liked');
 
-        // Compteurs pour analyser les données stockées
         const genreCounts: { [key: string]: number } = {};
-        const directorCounts: { [key: string]: number } = {};
         const actorCounts: { [key: string]: number } = {};
 
         likedItems.forEach((item: any) => {
-          // Analyse des genres si présents
           if (item.genres) {
             item.genres.split(',').forEach((g: string) => {
               const genre = g.trim();
               if (genre) genreCounts[genre] = (genreCounts[genre] || 0) + 1;
             });
           }
-          // Analyse des créateurs/acteurs si présents
           if (item.cast_crew) {
             item.cast_crew.split(',').forEach((c: string) => {
               const person = c.trim();
@@ -157,13 +153,12 @@ export default function ProfilePage() {
           }
         });
 
-        // Trier pour récupérer les top elements (ou mettre des valeurs par défaut si pas encore assez de données)
         const sortedGenres = Object.keys(genreCounts).sort((a, b) => genreCounts[b] - genreCounts[a]).slice(0, 3);
         const sortedActors = Object.keys(actorCounts).sort((a, b) => actorCounts[b] - actorCounts[a]).slice(0, 3);
 
         setPantheon({
           topGenres: sortedGenres.length > 0 ? sortedGenres : ['Science-Fiction', 'Action', 'Thriller'],
-          topDirectors: ['Christopher Nolan', 'Denis Villeneuve'], // Évoluera selon les données stockées
+          topDirectors: ['Christopher Nolan', 'Denis Villeneuve'],
           topActors: sortedActors.length > 0 ? sortedActors : ['Cillian Murphy', 'Keanu Reeves'],
         });
       }
