@@ -8,7 +8,7 @@ export default function PoteCornPartyPage() {
   const [mode, setMode] = useState<'menu' | 'solo' | 'duo_setup' | 'duo'>('menu');
   const [userId, setUserId] = useState<string>('');
   
-  // Nouveau : Gestion du Mode Duo
+  // Gestion du Mode Duo
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const [showMatchModal, setShowMatchModal] = useState(false);
@@ -47,7 +47,12 @@ export default function PoteCornPartyPage() {
     try {
       const randomPage = Math.floor(Math.random() * 20) + 1;
       const familyFilter = isFamilyMode ? '&with_genres=16,10751' : '';
-      const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc&page=${randomPage}${familyFilter}`;
+      
+      // NOUVEAU : Filtre intelligent Anti-Red Flags
+      // On exclut les mots-clés TMDB liés aux espaces confinés (ex: 9714 pour claustrophobia, 212999 pour one room)
+      const excludedKeywords = '9714,212999,273611'; 
+      
+      const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc&page=${randomPage}${familyFilter}&without_keywords=${excludedKeywords}`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -125,7 +130,6 @@ export default function PoteCornPartyPage() {
       const actionType = direction === 'right' ? 'liked' : 'disliked';
       
       try {
-        // 1. Sauvegarder le swipe avec le code de salon si actif
         await supabase.from('user_swipes').insert([
           {
             user_uid: userId,
@@ -137,7 +141,6 @@ export default function PoteCornPartyPage() {
           }
         ]);
 
-        // 2. Vérifier si l'autre personne a aussi liké (Uniquement en Mode Duo)
         if (actionType === 'liked' && activeRoom) {
           const { data: matchData, error: matchError } = await supabase
             .from('user_swipes')
@@ -145,10 +148,9 @@ export default function PoteCornPartyPage() {
             .eq('room_code', activeRoom)
             .eq('movie_id', currentMovie.id.toString())
             .eq('action', 'liked')
-            .neq('user_uid', userId); // Ne pas compter son propre swipe
+            .neq('user_uid', userId);
 
           if (matchData && matchData.length > 0) {
-            // MATCH !
             setMatchedMovie(currentMovie);
             setShowMatchModal(true);
           }
@@ -214,7 +216,6 @@ export default function PoteCornPartyPage() {
         .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
 
-      {/* POPUP DE MATCH ! */}
       {showMatchModal && matchedMovie && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div className="animate-pop-in" style={{ backgroundColor: '#18181B', border: '2px solid #EC4899', borderRadius: '24px', padding: '30px', textAlign: 'center', maxWidth: '400px', width: '100%', boxShadow: '0 0 50px rgba(236, 72, 153, 0.4)' }}>
@@ -223,15 +224,9 @@ export default function PoteCornPartyPage() {
               MATCH POTECORN !
             </h2>
             <p style={{ color: '#D4D4D8', marginBottom: '20px' }}>Vous avez tous les deux validé :</p>
-            
             <img src={matchedMovie.poster_path ? `https://image.tmdb.org/t/p/w500${matchedMovie.poster_path}` : ''} alt={matchedMovie.title} style={{ width: '150px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.5)' }} />
-            
             <h3 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 20px 0' }}>{matchedMovie.title}</h3>
-            
-            <button 
-              onClick={() => { setShowMatchModal(false); passeAuSuivant(); }}
-              style={{ backgroundColor: '#EC4899', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', width: '100%' }}
-            >
+            <button onClick={() => { setShowMatchModal(false); passeAuSuivant(); }} style={{ backgroundColor: '#EC4899', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', width: '100%' }}>
               Continuer à swiper
             </button>
           </div>
