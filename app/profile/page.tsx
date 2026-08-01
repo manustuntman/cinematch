@@ -44,7 +44,7 @@ export default function ProfilePage() {
   });
   const [swipes, setSwipes] = useState<any[]>([]);
 
-  // Panthéon (Calculé dynamiquement)
+  // Panthéon dynamique calculé à partir des likes
   const [pantheon, setPantheon] = useState({
     topGenres: [] as string[],
     topDirectors: [] as string[],
@@ -123,7 +123,7 @@ export default function ProfilePage() {
         });
       }
 
-      // Swipes & Calcul du Panthéon
+      // Swipes & Calcul automatique du Panthéon
       const { data: swipesData } = await supabase
         .from('user_swipes')
         .select('*')
@@ -133,14 +133,38 @@ export default function ProfilePage() {
       if (swipesData) {
         setSwipes(swipesData);
 
-        // Simulation / Extraction pour le Panthéon (basé sur les données stockées ou titres)
-        // Si tu ajoutes des colonnes genre/directeur/acteur plus tard dans user_swipes, on les exploitera ici.
-        const liked = swipesData.swipes?.filter((s: any) => s.action === 'liked') || [];
-        // Exemple de structure si les données sont présentes, sinon valeurs par défaut ludiques
+        const likedItems = swipesData.filter((s: any) => s.action === 'liked');
+
+        // Compteurs pour analyser les données stockées
+        const genreCounts: { [key: string]: number } = {};
+        const directorCounts: { [key: string]: number } = {};
+        const actorCounts: { [key: string]: number } = {};
+
+        likedItems.forEach((item: any) => {
+          // Analyse des genres si présents
+          if (item.genres) {
+            item.genres.split(',').forEach((g: string) => {
+              const genre = g.trim();
+              if (genre) genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+            });
+          }
+          // Analyse des créateurs/acteurs si présents
+          if (item.cast_crew) {
+            item.cast_crew.split(',').forEach((c: string) => {
+              const person = c.trim();
+              if (person) actorCounts[person] = (actorCounts[person] || 0) + 1;
+            });
+          }
+        });
+
+        // Trier pour récupérer les top elements (ou mettre des valeurs par défaut si pas encore assez de données)
+        const sortedGenres = Object.keys(genreCounts).sort((a, b) => genreCounts[b] - genreCounts[a]).slice(0, 3);
+        const sortedActors = Object.keys(actorCounts).sort((a, b) => actorCounts[b] - actorCounts[a]).slice(0, 3);
+
         setPantheon({
-          topGenres: ['Science-Fiction', 'Action', 'Thriller'],
-          topDirectors: ['Christopher Nolan', 'Denis Villeneuve'],
-          topActors: ['Cillian Murphy', 'Keanu Reeves'],
+          topGenres: sortedGenres.length > 0 ? sortedGenres : ['Science-Fiction', 'Action', 'Thriller'],
+          topDirectors: ['Christopher Nolan', 'Denis Villeneuve'], // Évoluera selon les données stockées
+          topActors: sortedActors.length > 0 ? sortedActors : ['Cillian Murphy', 'Keanu Reeves'],
         });
       }
 
@@ -494,7 +518,7 @@ export default function ProfilePage() {
                 <span style={{ fontSize: '24px' }}>🏛️</span>
                 <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#FBBF24', margin: 0 }}>Le Panthéon du Cinéphile</h3>
               </div>
-              <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Tes préférences absolues basées sur tes œuvres validées.</p>
+              <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Tes préférences absolues basées sur tes swipes validés.</p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
                 {/* Genres Fétiches */}
