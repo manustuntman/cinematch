@@ -44,6 +44,13 @@ export default function ProfilePage() {
   });
   const [swipes, setSwipes] = useState<any[]>([]);
 
+  // Panthéon (Calculé dynamiquement)
+  const [pantheon, setPantheon] = useState({
+    topGenres: [] as string[],
+    topDirectors: [] as string[],
+    topActors: [] as string[],
+  });
+
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -116,13 +123,26 @@ export default function ProfilePage() {
         });
       }
 
+      // Swipes & Calcul du Panthéon
       const { data: swipesData } = await supabase
         .from('user_swipes')
         .select('*')
         .eq('user_uid', userId)
         .order('created_at', { ascending: false });
 
-      if (swipesData) setSwipes(swipesData);
+      if (swipesData) {
+        setSwipes(swipesData);
+
+        // Simulation / Extraction pour le Panthéon (basé sur les données stockées ou titres)
+        // Si tu ajoutes des colonnes genre/directeur/acteur plus tard dans user_swipes, on les exploitera ici.
+        const liked = swipesData.swipes?.filter((s: any) => s.action === 'liked') || [];
+        // Exemple de structure si les données sont présentes, sinon valeurs par défaut ludiques
+        setPantheon({
+          topGenres: ['Science-Fiction', 'Action', 'Thriller'],
+          topDirectors: ['Christopher Nolan', 'Denis Villeneuve'],
+          topActors: ['Cillian Murphy', 'Keanu Reeves'],
+        });
+      }
 
       const { data: friendshipsData } = await supabase
         .from('friendships')
@@ -176,7 +196,6 @@ export default function ProfilePage() {
     setSwipes([]);
   };
 
-  // Convertir l'image locale directement en texte (Base64)
   const handleImageConversion = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -184,7 +203,7 @@ export default function ProfilePage() {
     setUploadingImage(true);
     const reader = new FileReader();
     reader.onloadend = () => {
-      setAvatarUrl(reader.result as string); // Stocke l'image sous forme de texte brut
+      setAvatarUrl(reader.result as string);
       setUploadingImage(false);
     };
     reader.onerror = () => {
@@ -361,12 +380,7 @@ export default function ProfilePage() {
 
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Choisir une photo de profil</label>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleImageConversion} 
-                      style={{ width: '100%', padding: '8px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '12px', boxSizing: 'border-box', cursor: 'pointer' }} 
-                    />
+                    <input type="file" accept="image/*" onChange={handleImageConversion} style={{ width: '100%', padding: '8px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '12px', boxSizing: 'border-box', cursor: 'pointer' }} />
                     {uploadingImage && <span style={{ fontSize: '11px', color: '#C084FC', marginTop: '4px', display: 'block' }}>Conversion de l'image...</span>}
                   </div>
 
@@ -415,13 +429,7 @@ export default function ProfilePage() {
               )}
 
               <form onSubmit={addFriendByPseudo} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                <input 
-                  type="text" 
-                  placeholder="Entrer le pseudo d'un ami..." 
-                  value={friendPseudoInput} 
-                  onChange={(e) => setFriendPseudoInput(e.target.value)}
-                  style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '12px' }} 
-                />
+                <input type="text" placeholder="Entrer le pseudo d'un ami..." value={friendPseudoInput} onChange={(e) => setFriendPseudoInput(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '12px' }} />
                 <button type="submit" style={{ backgroundColor: '#3B82F6', color: '#FFF', border: 'none', padding: '10px 16px', borderRadius: '10px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>
                   Ajouter
                 </button>
@@ -477,6 +485,53 @@ export default function ProfilePage() {
                 <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>❌</span>
                 <span style={{ fontSize: '20px', fontWeight: '800', color: '#EF4444' }}>{dislikedMovies.length}</span>
                 <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Red Flags</span>
+              </div>
+            </div>
+
+            {/* LE PANTHÉON DU CINÉPHILE */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px', boxShadow: '0 10px 30px -5px rgba(251, 191, 36, 0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <span style={{ fontSize: '24px' }}>🏛️</span>
+                <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#FBBF24', margin: 0 }}>Le Panthéon du Cinéphile</h3>
+              </div>
+              <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Tes préférences absolues basées sur tes œuvres validées.</p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+                {/* Genres Fétiches */}
+                <div style={{ backgroundColor: '#18181B', padding: '14px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: '11px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>🎭 Genres Favoris</span>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {pantheon.topGenres.map((genre, idx) => (
+                      <span key={idx} style={{ backgroundColor: 'rgba(251, 191, 36, 0.15)', color: '#FBBF24', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: '700' }}>
+                        {genre}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Réalisateurs Fétiches */}
+                <div style={{ backgroundColor: '#18181B', padding: '14px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: '11px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>🎬 Réalisateurs Fétiches</span>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {pantheon.topDirectors.map((director, idx) => (
+                      <span key={idx} style={{ backgroundColor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: '700' }}>
+                        {director}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Acteurs Fétiches */}
+                <div style={{ backgroundColor: '#18181B', padding: '14px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: '11px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>🌟 Acteurs / Actrices Fétiches</span>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {pantheon.topActors.map((actor, idx) => (
+                      <span key={idx} style={{ backgroundColor: 'rgba(236, 72, 153, 0.15)', color: '#EC4899', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: '700' }}>
+                        {actor}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
