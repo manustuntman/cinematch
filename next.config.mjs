@@ -22,8 +22,6 @@ const nextConfig = {
       },
     ],
   },
-  // La ligne magique pour corriger l'erreur Vercel
-  turbopack: {},
 };
 
 export default withPWA(nextConfig);
