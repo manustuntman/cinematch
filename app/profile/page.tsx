@@ -244,7 +244,7 @@ export default function ProfilePage() {
         setFriends([]);
       }
 
-      // 6. Demandes d'amis en attente (reçues)
+      // 6. Demandes d'amis en attente (reçues où l'utilisateur est le friend_id)
       const { data: pendingData } = await supabase
         .from('friendships')
         .select('*')
@@ -367,7 +367,7 @@ export default function ProfilePage() {
         return;
       }
 
-      // Vérifier si une relation existe déjà (en attente ou acceptée)
+      // Vérifier si une relation existe déjà
       const { data: existing } = await supabase
         .from('friendships')
         .select('*')
@@ -397,7 +397,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Répondre à une demande d'ami
   const respondToRequest = async (requestId: string, status: 'accepted' | 'declined') => {
     try {
       if (status === 'declined') {
