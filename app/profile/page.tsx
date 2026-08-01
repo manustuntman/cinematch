@@ -5,7 +5,15 @@ import { supabase } from '@/lib/supabaseClient';
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string>('');
+  const [user, setUser] = useState<any>(null);
+
+  // États pour le formulaire de connexion / inscription
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  // Statistiques & Données utilisateur
   const [stats, setStats] = useState({
     watchedCount: 0,
     toWatchCount: 0,
@@ -17,12 +25,38 @@ export default function ProfilePage() {
   });
   const [swipes, setSwipes] = useState<any[]>([]);
 
-  const fetchProfileData = async () => {
+  // 1. Vérifier si un utilisateur est déjà connecté au chargement
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUser(session.user);
+        fetchUserData(session.user.id);
+      } else {
+        setLoading(false);
+      }
+
+      // Écouter les changements de connexion en direct
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session) {
+          setUser(session.user);
+          fetchUserData(session.user.id);
+        } else {
+          setUser(null);
+          setLoading(false);
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    };
+
+    checkUser();
+  }, []);
+
+  // 2. Charger les données (Watchlist & Swipes) de l'utilisateur connecté
+  const fetchUserData = async (userId: string) => {
     setLoading(true);
     try {
-      const storedId = localStorage.getItem('potecorn_uid') || '';
-      setUserId(storedId);
-
       const { data: watchlistData, error: watchlistError } = await supabase.from('watchlist').select('*');
       if (watchlistError) throw watchlistError;
 
@@ -51,26 +85,50 @@ export default function ProfilePage() {
         });
       }
 
-      if (storedId) {
-        const { data: swipesData, error: swipesError } = await supabase
-          .from('user_swipes')
-          .select('*')
-          .eq('user_uid', storedId)
-          .order('created_at', { ascending: false });
+      // Charger les swipes liés à cet utilisateur
+      const { data: swipesData, error: swipesError } = await supabase
+        .from('user_swipes')
+        .select('*')
+        .eq('user_uid', userId)
+        .order('created_at', { ascending: false });
 
-        if (!swipesError && swipesData) {
-          setSwipes(swipesData);
-        }
+      if (!swipesError && swipesData) {
+        setSwipes(swipesData);
       }
+
     } catch (err) {
-      console.error('Erreur lors du chargement du profil :', err);
+      console.error('Erreur lors du chargement des données :', err);
     }
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchProfileData();
-  }, []);
+  // Gestion de la Connexion / Inscription
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert('Compte créé avec succès ! Vous êtes connecté.');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'Une erreur est survenue.');
+      setLoading(false);
+    }
+  };
+
+  // Déconnexion
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSwipes([]);
+  };
 
   const likedMovies = swipes.filter(s => s.action === 'liked');
   const dislikedMovies = swipes.filter(s => s.action === 'disliked');
@@ -91,9 +149,71 @@ export default function ProfilePage() {
         </div>
 
         {loading ? (
-          <p style={{ textAlign: 'center', color: '#A1A1AA', padding: '40px 0' }}>Mise à jour des trophées...</p>
+          <p style={{ textAlign: 'center', color: '#A1A1AA', padding: '40px 0' }}>Chargement...</p>
+        ) : !user ? (
+          /* FORMULAIRE DE CONNEXION / INSCRIPTION SI PAS CONNECTÉ */
+          <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '30px', marginTop: '40px', textAlign: 'center' }}>
+            <span style={{ fontSize: '40px', display: 'block', marginBottom: '16px' }}>🔐</span>
+            <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 8px 0' }}>{isSignUp ? 'Créer un compte' : 'Connexion'}</h2>
+            <p style={{ fontSize: '13px', color: '#A1A1AA', marginBottom: '24px' }}>Sauvegardez votre progression, vos niveaux et vos swipes en vous inscrivant.</p>
+
+            {authError && (
+              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '10px', borderRadius: '8px', fontSize: '12px', marginBottom: '16px' }}>
+                {authError}
+              </div>
+            )}
+
+            <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Email</label>
+                <input 
+                  type="email" 
+                  required
+                  placeholder="votre@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Mot de passe</label>
+                <input 
+                  type="password" 
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <button type="submit" style={{ width: '100%', backgroundColor: '#EC4899', color: '#FFF', border: 'none', padding: '14px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', marginTop: '10px' }}>
+                {isSignUp ? "S'inscrire" : 'Se connecter'}
+              </button>
+            </form>
+
+            <button 
+              onClick={() => setIsSignUp(!isSignUp)}
+              style={{ background: 'none', border: 'none', color: '#C084FC', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginTop: '20px' }}
+            >
+              {isSignUp ? 'Déjà un compte ? Connectez-vous' : "Pas encore de compte ? S'inscrire"}
+            </button>
+          </div>
         ) : (
+          /* PROFIL UTILISATEUR CONNECTÉ */
           <div>
+            {/* EMAIL ET DÉCONNEXION */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px 20px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: '10px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px' }}>Connecté en tant que</span>
+                <p style={{ fontSize: '13px', fontWeight: '700', color: '#FFF', margin: '2px 0 0 0' }}>{user.email}</p>
+              </div>
+              <button onClick={handleLogout} style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                Déconnexion
+              </button>
+            </div>
+
             {/* CARTE NIVEAU & XP */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px', textAlign: 'center', boxShadow: '0 10px 30px -5px rgba(147, 51, 234, 0.2)' }}>
               <div style={{ width: '70px', height: '70px', borderRadius: '50%', backgroundColor: '#9333EA', margin: '0 auto 12px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', border: '3px solid #C084FC' }}>
@@ -136,7 +256,6 @@ export default function ProfilePage() {
               <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#C084FC', margin: '0 0 16px 0' }}>🏅 Mes Badges & Succès</h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                {/* Badges de base */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.watchedCount >= 1 ? 1 : 0.3 }}>
                   <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🍿</div>
                   <div>
@@ -153,7 +272,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* NOUVEAUX BADGES THEMATIQUES */}
                 <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '4px 0' }}></div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 3 ? 1 : 0.3 }}>
@@ -179,7 +297,6 @@ export default function ProfilePage() {
                     <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Survivre à 10 films post-apocalyptiques</p>
                   </div>
                 </div>
-
               </div>
             </div>
 
@@ -190,7 +307,7 @@ export default function ProfilePage() {
                 <a href="/potecorn-party" style={{ fontSize: '11px', color: '#C084FC', textDecoration: 'none', fontWeight: '600' }}>Relancer →</a>
               </div>
               {swipes.length === 0 ? (
-                <p style={{ fontSize: '12px', color: '#A1A1AA', textAlign: 'center', margin: '20px 0' }}>Aucun film swipé.</p>
+                <p style={{ fontSize: '12px', color: '#A1A1AA', textAlign: 'center', margin: '20px 0' }}>Aucun film swipé avec ce compte.</p>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
                   {swipes.map((item) => (
@@ -216,6 +333,7 @@ export default function ProfilePage() {
 
           </div>
         )}
+
       </div>
     </main>
   );
