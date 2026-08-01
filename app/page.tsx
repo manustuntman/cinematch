@@ -3,321 +3,210 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
-export default function ProfilePage() {
+export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
-  const [userId, setUserId] = useState<string>('');
-  const [profile, setProfile] = useState<any>({
-    username: '',
-    age: '',
-    sex: '',
-    region: '',
-    bio: '',
-    avatar_url: '',
-    xp: 0
-  });
-  const [isEditing, setIsEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [compatibilityList, setCompatibilityList] = useState<any[]>([]);
-  const [likedMoviesCount, setLikedMoviesCount] = useState(0);
-  const [favoriteGenres, setFavoriteGenres] = useState<string[]>([]);
+  const [session, setSession] = useState<any>(null);
+  const [trendingMovies, setTrendingMovies] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [announcement, setAnnouncement] = useState<string | null>(null);
+
+  const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
 
   useEffect(() => {
     setIsMounted(true);
-    const getAuthUserAndProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      let currentId = '';
 
-      if (session) {
-        currentId = session.user.id;
-      } else {
-        currentId = localStorage.getItem('potecorn_uid') || '';
+    const initHome = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+
+      try {
+        const res = await fetch(`https://api.themoviedb.org/3/trending/movie/day?api_key=${API_KEY}&language=fr-FR`);
+        const data = await res.json();
+        if (data.results) setTrendingMovies(data.results);
+      } catch (err) {
+        console.error('Erreur chargement tendances:', err);
       }
-      setUserId(currentId);
 
-      if (currentId) {
-        const { data: profileData } = await supabase
-          .from('profiles')
+      try {
+        const { data: annData } = await supabase
+          .from('announcements')
           .select('*')
-          .eq('id', currentId)
-          .single();
+          .order('created_at', { ascending: false })
+          .limit(1);
 
-        if (profileData) {
-          setProfile(profileData);
+        if (annData && annData.length > 0) {
+          setAnnouncement(annData[0].message);
         }
-
-        const { data: swipesData } = await supabase
-          .from('user_swipes')
-          .select('*')
-          .eq('user_uid', currentId);
-
-        if (swipesData) {
-          const likes = swipesData.filter(s => s.action === 'liked');
-          setLikedMoviesCount(likes.length);
-
-          const genreCounts: { [key: string]: number } = {};
-          likes.forEach(s => {
-            if (s.genres) {
-              s.genres.split(', ').forEach((g: string) => {
-                genreCounts[g] = (genreCounts[g] || 0) + 1;
-              });
-            }
-          });
-          const sortedGenres = Object.keys(genreCounts).sort((a, b) => genreCounts[b] - genreCounts[a]);
-          setFavoriteGenres(sortedGenres.slice(0, 3));
-        }
-
-        calculateCompatibility(currentId);
+      } catch (err) {
+        console.error('Erreur chargement annonce:', err);
       }
     };
 
-    getAuthUserAndProfile();
+    initHome();
   }, []);
 
-  const calculateCompatibility = async (currentUserId: string) => {
-    try {
-      const { data: mySwipes } = await supabase
-        .from('user_swipes')
-        .select('movie_id')
-        .eq('user_uid', currentUserId)
-        .eq('action', 'liked');
-
-      if (!mySwipes || mySwipes.length === 0) return;
-      const myLikedMovies = mySwipes.map(s => s.movie_id);
-
-      const { data: allProfiles } = await supabase
-        .from('profiles')
-        .select('id, username, region')
-        .neq('id', currentUserId);
-
-      const { data: allSwipes } = await supabase
-        .from('user_swipes')
-        .select('user_uid, movie_id')
-        .eq('action', 'liked');
-
-      if (!allProfiles || !allSwipes) return;
-
-      const compatResults = allProfiles.map(otherUser => {
-        const otherLikes = allSwipes.filter(s => s.user_uid === otherUser.id).map(s => s.movie_id);
-        if (otherLikes.length === 0) return { ...otherUser, score: 0 };
-
-        const commonMovies = myLikedMovies.filter(id => otherLikes.includes(id));
-        const score = Math.round((commonMovies.length / Math.max(myLikedMovies.length, otherLikes.length)) * 100);
-
-        return {
-          ...otherUser,
-          score: score > 100 ? 100 : score
-        };
-      });
-
-      compatResults.sort((a, b) => b.score - a.score);
-      setCompatibilityList(compatResults);
-    } catch (err) {
-      console.error('Erreur calcul compatibilité:', err);
-    }
-  };
-
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userId) return;
-    setSaving(true);
+    if (!searchQuery.trim()) return;
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert([
-          {
-            id: userId,
-            username: profile.username,
-            age: profile.age ? parseInt(profile.age) : null,
-            sex: profile.sex,
-            region: profile.region,
-            bio: profile.bio,
-            avatar_url: profile.avatar_url,
-            updated_at: new Date()
-          }
-        ]);
-
-      if (error) throw error;
-      setIsEditing(false);
-      alert('Profil mis à jour avec succès ! ✨');
+      const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&language=fr-FR&query=${encodeURIComponent(searchQuery)}`);
+      const data = await res.json();
+      if (data.results) setSearchResults(data.results);
     } catch (err) {
-      console.error('Erreur sauvegarde profil:', err);
-      alert('Erreur lors de la sauvegarde.');
+      console.error('Erreur recherche:', err);
     }
-    setSaving(false);
   };
-
-  const userXp = profile.xp || (likedMoviesCount * 50);
-  const userLevel = Math.floor(userXp / 500) + 1;
 
   if (!isMounted) return null;
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#000000', color: '#FFFFFF', padding: '30px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', paddingBottom: '80px' }}>
+    <main style={{ minHeight: '100vh', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', paddingBottom: '80px' }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         
-        {/* EN-TÊTE */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }}>
-          <a href="/" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', padding: '10px 16px', borderRadius: '14px', fontSize: '13px', fontWeight: '700', textDecoration: 'none' }}>
-            ← Accueil
-          </a>
-          <h1 style={{ fontSize: '24px', fontWeight: '900', margin: 0, background: 'linear-gradient(to right, #EC4899, #C084FC)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-             Mon Profil Cinéphile
-          </h1>
-          <div style={{ width: '70px' }}></div>
-        </div>
-
-        {/* CARTE D'IDENTITÉ CINÉPHILE (STYLE CARTE OFFICIELLE) */}
-        <div style={{ background: 'linear-gradient(135deg, rgba(24, 24, 27, 0.98), rgba(39, 39, 42, 0.95))', border: '2px solid rgba(236, 72, 153, 0.5)', borderRadius: '32px', padding: '28px', marginBottom: '28px', boxShadow: '0 25px 50px rgba(0,0,0,0.8)', position: 'relative', overflow: 'hidden' }}>
-          
-          <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '150px', height: '150px', background: 'radial-gradient(circle, rgba(236, 72, 153, 0.25) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt="Avatar" style={{ width: '68px', height: '68px', borderRadius: '22px', objectFit: 'cover', border: '2px solid #EC4899', boxShadow: '0 10px 20px rgba(236, 72, 153, 0.4)' }} />
-              ) : (
-                <div style={{ width: '68px', height: '68px', borderRadius: '22px', background: 'linear-gradient(135deg, #EC4899, #9333EA)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '30px', boxShadow: '0 10px 20px rgba(236, 72, 153, 0.4)' }}>
-                  🍿
-                </div>
-              )}
-              <div>
-                <h2 style={{ fontSize: '20px', fontWeight: '900', margin: '0 0 4px 0', color: '#FFF' }}>{profile.username || 'Cinéphile Anonyme'}</h2>
-                <span style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '800' }}>Niveau {userLevel} • {userXp} XP ⚡</span>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => setIsEditing(!isEditing)}
-              style={{ backgroundColor: isEditing ? '#27272A' : 'rgba(236, 72, 153, 0.2)', color: isEditing ? '#FFF' : '#EC4899', border: isEditing ? '1px solid #3F3F46' : '1px solid rgba(236, 72, 153, 0.5)', padding: '10px 16px', borderRadius: '14px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
-            >
-              {isEditing ? '✕ Annuler' : 'Modifier ✏️'}
-            </button>
+        {announcement && (
+          <div style={{ backgroundColor: 'rgba(236, 72, 153, 0.15)', border: '1px solid rgba(236, 72, 153, 0.4)', borderRadius: '16px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '20px' }}>📢</span>
+            <p style={{ fontSize: '13px', color: '#FBCFE8', margin: 0, fontWeight: '700', lineHeight: '1.4' }}>{announcement}</p>
           </div>
+        )}
 
-          {!isEditing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
-                  <span style={{ fontSize: '10px', fontWeight: '800', color: '#A1A1AA', display: 'block', textTransform: 'uppercase', marginBottom: '2px' }}>Âge</span>
-                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#FFF' }}>{profile.age ? `${profile.age} ans` : '-'}</span>
-                </div>
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
-                  <span style={{ fontSize: '10px', fontWeight: '800', color: '#A1A1AA', display: 'block', textTransform: 'uppercase', marginBottom: '2px' }}>Sexe</span>
-                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#FFF' }}>{profile.sex || '-'}</span>
-                </div>
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
-                  <span style={{ fontSize: '10px', fontWeight: '800', color: '#A1A1AA', display: 'block', textTransform: 'uppercase', marginBottom: '2px' }}>Région</span>
-                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#FFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{profile.region || '-'}</span>
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: 'rgba(0,0,0,0.4)', padding: '16px 18px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: '#A1A1AA', display: 'block', textTransform: 'uppercase', marginBottom: '6px' }}>Bio / Citation favorite</span>
-                <p style={{ fontSize: '14px', color: '#D4D4D8', margin: 0, fontStyle: profile.bio ? 'normal' : 'italic', lineHeight: '1.4' }}>{profile.bio || 'Aucune bio renseignée pour le moment...'}</p>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Pseudo</label>
-                <input type="text" value={profile.username || ''} onChange={(e) => setProfile({ ...profile, username: e.target.value })} style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#18181B', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Âge</label>
-                  <input type="number" value={profile.age || ''} onChange={(e) => setProfile({ ...profile, age: e.target.value })} style={{ width: '100%', padding: '12px 10px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#18181B', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Sexe</label>
-                  <input type="text" placeholder="Ex: M / F" value={profile.sex || ''} onChange={(e) => setProfile({ ...profile, sex: e.target.value })} style={{ width: '100%', padding: '12px 10px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#18181B', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Région</label>
-                  <input type="text" value={profile.region || ''} onChange={(e) => setProfile({ ...profile, region: e.target.value })} style={{ width: '100%', padding: '12px 10px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#18181B', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>URL de la photo de profil (Avatar)</label>
-                <input type="text" placeholder="https://..." value={profile.avatar_url || ''} onChange={(e) => setProfile({ ...profile, avatar_url: e.target.value })} style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#18181B', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Bio</label>
-                <textarea rows={2} value={profile.bio || ''} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#18181B', color: '#FFF', fontSize: '14px', boxSizing: 'border-box', resize: 'vertical' }} />
-              </div>
-
-              <button type="submit" disabled={saving} style={{ backgroundColor: '#EC4899', color: '#FFF', border: 'none', padding: '14px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', marginTop: '6px' }}>
-                {saving ? 'Enregistrement...' : 'Enregistrer les modifications 💾'}
-              </button>
-            </form>
-          )}
-
-        </div>
-
-        {/* PANTHÉON & STATISTIQUES CINÉPHILES */}
-        <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(147, 51, 234, 0.4)', borderRadius: '28px', padding: '24px', marginBottom: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-            <span style={{ fontSize: '24px' }}>🏛️</span>
-            <h2 style={{ fontSize: '17px', fontWeight: '900', color: '#C084FC', margin: 0 }}>Panthéon Cinéphile</h2>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ backgroundColor: '#27272A', padding: '16px', borderRadius: '16px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '22px', fontWeight: '900', color: '#4ADE80', display: 'block', marginBottom: '4px' }}>{likedMoviesCount}</span>
-              <span style={{ fontSize: '12px', color: '#A1A1AA', fontWeight: '600' }}>Films Validés (Likes)</span>
-            </div>
-            <div style={{ backgroundColor: '#27272A', padding: '16px', borderRadius: '16px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '22px', fontWeight: '900', color: '#FBBF24', display: 'block', marginBottom: '4px' }}>{userLevel}</span>
-              <span style={{ fontSize: '12px', color: '#A1A1AA', fontWeight: '600' }}>Niveau Actuel</span>
-            </div>
-          </div>
-
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
-            <span style={{ fontSize: '12px', fontWeight: '800', color: '#A1A1AA', display: 'block', marginBottom: '10px' }}>Genres Favoris :</span>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {favoriteGenres.length === 0 ? (
-                <span style={{ fontSize: '13px', color: '#71717A' }}>Swipe des films pour découvrir tes genres favoris !</span>
-              ) : (
-                favoriteGenres.map((genre) => (
-                  <span key={genre} style={{ backgroundColor: 'rgba(147, 51, 234, 0.25)', border: '1px solid rgba(147, 51, 234, 0.5)', color: '#D8B4FE', padding: '6px 14px', borderRadius: '12px', fontSize: '12px', fontWeight: '800' }}>
-                    {genre}
-                  </span>
-                ))
-              )}
-            </div>
+            <h1 style={{ fontSize: '24px', fontWeight: '900', margin: 0, background: 'linear-gradient(to right, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              🍿 PoteCorn
+            </h1>
+            <p style={{ fontSize: '12px', color: '#A1A1AA', margin: '2px 0 0 0' }}>Trouve le film parfait en solo ou en duo</p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <a href="/profile" style={{ backgroundColor: '#27272A', color: '#FFF', padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}>Profil 👤</a>
+            <a href="/playlists" style={{ backgroundColor: '#27272A', color: '#FFF', padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}>Playlists 📂</a>
+            <a href="/backstage" style={{ backgroundColor: 'rgba(251, 191, 36, 0.15)', color: '#FBBF24', padding: '8px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', textDecoration: 'none', border: '1px solid rgba(251, 191, 36, 0.3)' }}>Backstage 🛠️</a>
           </div>
         </div>
 
-        {/* MATRICE DE COMPATIBILITÉ */}
-        <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(236, 72, 153, 0.4)', borderRadius: '28px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-            <span style={{ fontSize: '24px' }}>💞</span>
-            <h2 style={{ fontSize: '17px', fontWeight: '900', color: '#EC4899', margin: 0 }}>Compatibilité Communautaire</h2>
-          </div>
+        <div style={{ marginBottom: '30px' }}>
+          <a href="/potecorn-party" style={{ display: 'block', background: 'linear-gradient(135deg, #9333EA, #EC4899)', borderRadius: '20px', padding: '20px', textDecoration: 'none', color: '#FFF', boxShadow: '0 10px 25px rgba(236, 72, 153, 0.3)', textAlign: 'center' }}>
+            <span style={{ fontSize: '28px', display: 'block', marginBottom: '6px' }}>🔥</span>
+            <h2 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 4px 0' }}>Lancer une PoteCorn Party</h2>
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Swipe en solo ou rejoins un salon duo !</p>
+          </a>
+        </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '220px', overflowY: 'auto' }}>
-            {compatibilityList.length === 0 ? (
-              <p style={{ fontSize: '13px', color: '#71717A', textAlign: 'center', padding: '16px 0' }}>Aucun autre utilisateur pour l'instant.</p>
-            ) : (
-              compatibilityList.map((user) => (
-                <div key={user.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#27272A', padding: '12px 16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div>
-                    <span style={{ fontSize: '14px', fontWeight: '800', color: '#FFF', display: 'block', marginBottom: '2px' }}>{user.username || 'Anonyme'}</span>
-                    <span style={{ fontSize: '11px', color: '#A1A1AA' }}>{user.region || 'Région non renseignée'}</span>
-                  </div>
-                  <div style={{ backgroundColor: 'rgba(236, 72, 153, 0.2)', border: '1px solid rgba(236, 72, 153, 0.5)', padding: '6px 12px', borderRadius: '12px', color: '#EC4899', fontSize: '13px', fontWeight: '900' }}>
-                    {user.score}% Match 🎯
-                  </div>
-                </div>
-              ))
-            )}
+        <div style={{ marginBottom: '30px' }}>
+          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '8px' }}>
+            <input 
+              type="text" 
+              placeholder="Rechercher un film..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ flex: 1, padding: '12px 16px', borderRadius: '14px', border: '1px solid #3F3F46', backgroundColor: '#18181B', color: '#FFF', fontSize: '14px', outline: 'none' }}
+            />
+            <button type="submit" style={{ backgroundColor: '#EC4899', color: '#FFF', border: 'none', padding: '0 18px', borderRadius: '14px', fontWeight: '800', cursor: 'pointer' }}>🔍</button>
+          </form>
+
+          {searchResults.length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#EC4899', marginBottom: '10px' }}>Résultats de recherche</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                {searchResults.map((movie) => (
+                  <MovieCardWithPlaylist key={movie.id} movie={movie} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#FBBF24', marginBottom: '14px' }}>🔥 Tendances du Jour</h2>
+          <div style={{ display: 'flex', gap: '14px', overflowX: 'auto', paddingBottom: '10px', scrollbarWidth: 'none' }}>
+            {trendingMovies.map((movie) => (
+              <div key={movie.id} style={{ minWidth: '130px', maxWidth: '130px', flexShrink: 0 }}>
+                <MovieCardWithPlaylist movie={movie} isCarousel />
+              </div>
+            ))}
           </div>
         </div>
 
       </div>
     </main>
+  );
+}
+
+// Composant interne intégré pour gérer l'ajout aux playlists sans erreur de fichier externe
+function MovieCardWithPlaylist({ movie, isCarousel = false }: { movie: any; isCarousel?: boolean }) {
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    const fetchPl = async () => {
+      const { data } = await supabase.from('playlists').select('*');
+      if (data) setPlaylists(data);
+    };
+    fetchPl();
+  }, []);
+
+  const handleAdd = async (e: React.MouseEvent, playlistId: number) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    try {
+      const { error } = await supabase.from('playlist_movies').insert([
+        {
+          playlist_id: playlistId,
+          tmdb_id: movie.id.toString(),
+          title: movie.title,
+          poster_path: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null
+        }
+      ]);
+
+      if (error) throw error;
+      alert('Film ajouté à la playlist ! ✨');
+      setShowDropdown(false);
+    } catch (err) {
+      alert('Ce film est déjà dans cette playlist.');
+    }
+  };
+
+  return (
+    <div style={{ backgroundColor: '#18181B', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', position: 'relative', width: isCarousel ? '130px' : '100%' }}>
+      
+      <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}>
+        <button 
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowDropdown(!showDropdown); }}
+          style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', color: '#FFF', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}
+        >
+          📂 +
+        </button>
+
+        {showDropdown && (
+          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '6px', backgroundColor: '#18181B', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '14px', padding: '10px', minWidth: '150px', zIndex: 999, boxShadow: '0 10px 25px rgba(0,0,0,0.8)' }}>
+            <p style={{ fontSize: '10px', fontWeight: '800', color: '#A1A1AA', margin: '0 0 6px 0', textTransform: 'uppercase' }}>Ajouter à :</p>
+            {playlists.length === 0 ? (
+              <p style={{ fontSize: '11px', color: '#71717A', margin: 0 }}>Aucune playlist</p>
+            ) : (
+              playlists.map((pl) => (
+                <div 
+                  key={pl.id} 
+                  onClick={(e) => handleAdd(e, pl.id)}
+                  style={{ padding: '6px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', background: '#27272A' }}
+                >
+                  <span>{pl.icon || '🎬'}</span>
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pl.title}</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      <img src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://via.placeholder.com/300x450'} alt={movie.title} style={{ width: '100%', height: isCarousel ? '180px' : '200px', objectFit: 'cover' }} />
+      <div style={{ padding: '10px' }}>
+        <h4 style={{ fontSize: isCarousel ? '12px' : '13px', fontWeight: '800', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{movie.title}</h4>
+        {isCarousel && <span style={{ fontSize: '10px', color: '#FBBF24', fontWeight: '700' }}>★ {movie.vote_average?.toFixed(1)}</span>}
+      </div>
+    </div>
   );
 }
