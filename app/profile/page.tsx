@@ -7,13 +7,28 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
 
-  // États pour le formulaire de connexion / inscription
+  // Auth form
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // Statistiques & Données utilisateur
+  // Profil
+  const [username, setUsername] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
+  const [country, setCountry] = useState('');
+  const [region, setRegion] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Amis
+  const [friends, setFriends] = useState<any[]>([]);
+  const [friendInput, setFriendInput] = useState('');
+  const [friendError, setFriendError] = useState('');
+
+  // Stats & Données
   const [stats, setStats] = useState({
     watchedCount: 0,
     toWatchCount: 0,
@@ -25,24 +40,23 @@ export default function ProfilePage() {
   });
   const [swipes, setSwipes] = useState<any[]>([]);
 
-  // 1. Vérifier si un utilisateur est déjà connecté au chargement
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setUser(session.user);
-        fetchUserData(session.user.id);
+        await fetchUserData(session.user.id);
       } else {
         setLoading(false);
       }
 
-      // Écouter les changements de connexion en direct
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session) {
           setUser(session.user);
-          fetchUserData(session.user.id);
+          await fetchUserData(session.user.id);
         } else {
           setUser(null);
+          setSwipes();
           setLoading(false);
         }
       });
@@ -53,13 +67,28 @@ export default function ProfilePage() {
     checkUser();
   }, []);
 
-  // 2. Charger les données (Watchlist & Swipes) de l'utilisateur connecté
   const fetchUserData = async (userId: string) => {
     setLoading(true);
     try {
-      const { data: watchlistData, error: watchlistError } = await supabase.from('watchlist').select('*');
-      if (watchlistError) throw watchlistError;
+      // 1. Profil
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
+      if (profileData) {
+        setUsername(profileData.username || '');
+        setAvatarUrl(profileData.avatar_url || '');
+        setAge(profileData.age ? profileData.age.toString() : '');
+        setGender(profileData.gender || '');
+        setCountry(profileData.country || '');
+        setRegion(profileData.region || '');
+        setIsPublic(profileData.is_public ?? true);
+      }
+
+      // 2. Watchlist & XP
+      const { data: watchlistData } = await supabase.from('watchlist').select('*');
       if (watchlistData) {
         const watched = watchlistData.filter((item) => item.status === 'watched');
         const toWatch = watchlistData.filter((item) => item.status === 'to_watch');
@@ -85,24 +114,32 @@ export default function ProfilePage() {
         });
       }
 
-      // Charger les swipes liés à cet utilisateur
-      const { data: swipesData, error: swipesError } = await supabase
+      // 3. Swipes
+      const { data: swipesData } = await supabase
         .from('user_swipes')
         .select('*')
         .eq('user_uid', userId)
         .order('created_at', { ascending: false });
 
-      if (!swipesError && swipesData) {
-        setSwipes(swipesData);
+      if (swipesData) setSwipes(swipesData);
+
+      // 4. Amis
+      const { data: friendshipsData } = await supabase
+        .from('friendships')
+        .select('*')
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .eq('status', 'accepted');
+
+      if (friendshipsData) {
+        setFriends(friendshipsData);
       }
 
     } catch (err) {
-      console.error('Erreur lors du chargement des données :', err);
+      console.error('Erreur chargement données:', err);
     }
     setLoading(false);
   };
 
-  // Gestion de la Connexion / Inscription
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -112,7 +149,7 @@ export default function ProfilePage() {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        alert('Compte créé avec succès ! Vous êtes connecté.');
+        alert('Compte créé avec succès !');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -123,11 +160,68 @@ export default function ProfilePage() {
     }
   };
 
-  // Déconnexion
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
     setSwipes([]);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setSavingProfile(true);
+
+    try {
+      const updates = {
+        id: user.id,
+        username,
+        avatar_url: avatarUrl,
+        age: age ? parseInt(age) : null,
+        gender,
+        country,
+        region,
+        is_public: isPublic,
+        updated_at: new Date(),
+      };
+
+      const { error } = await supabase.from('profiles').upsert(updates);
+      if (error) throw error;
+      alert('Profil mis à jour avec succès ! ✨');
+    } catch (err) {
+      console.error('Erreur sauvegarde profil:', err);
+      alert('Erreur lors de la sauvegarde.');
+    }
+    setSavingProfile(false);
+  };
+
+  const addFriend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFriendError('');
+    if (!friendInput.trim() || !user) return;
+
+    if (friendInput.trim() === user.id) {
+      setFriendError("Vous ne pouvez pas vous ajouter vous-même !");
+      return;
+    }
+
+    try {
+      // Vérifier si l'ami existe dans les profils ou auth
+      const { error } = await supabase.from('friendships').insert([
+        {
+          user_id: user.id,
+          friend_id: friendInput.trim(),
+          status: 'accepted' // Directement accepté pour simplifier
+        }
+      ]);
+
+      if (error) throw error;
+      alert('Ami ajouté avec succès !');
+      setFriendInput('');
+      fetchUserData(user.id);
+    } catch (err) {
+      console.error('Erreur ajout ami:', err);
+      setFriendError("Impossible d'ajouter cet utilisateur (Vérifiez l'ID).");
+    }
   };
 
   const likedMovies = swipes.filter(s => s.action === 'liked');
@@ -137,13 +231,13 @@ export default function ProfilePage() {
     <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <div style={{ maxWidth: '650px', margin: '0 auto' }}>
         
-        {/* HEADER DE NAVIGATION */}
+        {/* HEADER */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
           <a href="/" style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)', color: '#FFF', padding: '6px 14px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
             ← Accueil
           </a>
           <h1 style={{ fontSize: '20px', fontWeight: '800', margin: 0, background: 'linear-gradient(to right, #C084FC, #EC4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            Mon Profil
+            Mon Profil Cinéphile
           </h1>
           <div style={{ width: '60px' }}></div>
         </div>
@@ -151,11 +245,11 @@ export default function ProfilePage() {
         {loading ? (
           <p style={{ textAlign: 'center', color: '#A1A1AA', padding: '40px 0' }}>Chargement...</p>
         ) : !user ? (
-          /* FORMULAIRE DE CONNEXION / INSCRIPTION SI PAS CONNECTÉ */
+          /* CONNEXION / INSCRIPTION */
           <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '30px', marginTop: '40px', textAlign: 'center' }}>
             <span style={{ fontSize: '40px', display: 'block', marginBottom: '16px' }}>🔐</span>
             <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 8px 0' }}>{isSignUp ? 'Créer un compte' : 'Connexion'}</h2>
-            <p style={{ fontSize: '13px', color: '#A1A1AA', marginBottom: '24px' }}>Sauvegardez votre progression, vos niveaux et vos swipes en vous inscrivant.</p>
+            <p style={{ fontSize: '13px', color: '#A1A1AA', marginBottom: '24px' }}>Sauvegardez vos infos, votre pseudo et vos amis.</p>
 
             {authError && (
               <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '10px', borderRadius: '8px', fontSize: '12px', marginBottom: '16px' }}>
@@ -166,169 +260,100 @@ export default function ProfilePage() {
             <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
               <div>
                 <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Email</label>
-                <input 
-                  type="email" 
-                  required
-                  placeholder="votre@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }}
-                />
+                <input type="email" required placeholder="votre@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }} />
               </div>
-
               <div>
                 <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '6px' }}>Mot de passe</label>
-                <input 
-                  type="password" 
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }}
-                />
+                <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '14px', boxSizing: 'border-box' }} />
               </div>
-
               <button type="submit" style={{ width: '100%', backgroundColor: '#EC4899', color: '#FFF', border: 'none', padding: '14px', borderRadius: '12px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', marginTop: '10px' }}>
                 {isSignUp ? "S'inscrire" : 'Se connecter'}
               </button>
             </form>
-
-            <button 
-              onClick={() => setIsSignUp(!isSignUp)}
-              style={{ background: 'none', border: 'none', color: '#C084FC', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginTop: '20px' }}
-            >
+            <button onClick={() => setIsSignUp(!isSignUp)} style={{ background: 'none', border: 'none', color: '#C084FC', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginTop: '20px' }}>
               {isSignUp ? 'Déjà un compte ? Connectez-vous' : "Pas encore de compte ? S'inscrire"}
             </button>
           </div>
         ) : (
-          /* PROFIL UTILISATEUR CONNECTÉ */
+          /* PROFIL CONNECTÉ */
           <div>
-            {/* EMAIL ET DÉCONNEXION */}
+            {/* COMPTE & ID UTILISATEUR */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px 20px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <span style={{ fontSize: '10px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px' }}>Connecté en tant que</span>
-                <p style={{ fontSize: '13px', fontWeight: '700', color: '#FFF', margin: '2px 0 0 0' }}>{user.email}</p>
+                <span style={{ fontSize: '10px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px' }}>Mon ID unique (à partager)</span>
+                <p style={{ fontSize: '11px', fontWeight: '700', color: '#C084FC', margin: '2px 0 0 0', fontFamily: 'monospace' }}>{user.id}</p>
               </div>
               <button onClick={handleLogout} style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
                 Déconnexion
               </button>
             </div>
 
-            {/* CARTE NIVEAU & XP */}
-            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px', textAlign: 'center', boxShadow: '0 10px 30px -5px rgba(147, 51, 234, 0.2)' }}>
-              <div style={{ width: '70px', height: '70px', borderRadius: '50%', backgroundColor: '#9333EA', margin: '0 auto 12px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', border: '3px solid #C084FC' }}>
-                🎭
-              </div>
-              <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 4px 0' }}>Niveau {stats.level}</h2>
-              <span style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{stats.totalXP} XP Cumulés</span>
-              <div style={{ marginTop: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', height: '10px', borderRadius: '10px', overflow: 'hidden', position: 'relative' }}>
-                <div style={{ width: `${stats.xpProgress}%`, height: '100%', backgroundColor: '#9333EA', transition: 'width 0.4s ease' }} />
-              </div>
-              <span style={{ fontSize: '10px', color: '#A1A1AA', marginTop: '6px', display: 'block' }}>Prochain niveau dans {500 - (stats.totalXP % 500)} XP</span>
-            </div>
+            {/* GESTION DES AMIS */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#3B82F6', margin: '0 0 12px 0' }}>👥 Mes Amis & Duo</h3>
+              <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '16px' }}>Ajoute l'ID d'un ami pour lancer des sessions Duo directes avec lui.</p>
 
-            {/* GRILLE DES STATISTIQUES */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '24px' }}>
-              <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>🎬</span>
-                <span style={{ fontSize: '20px', fontWeight: '800', color: '#FFF' }}>{stats.moviesCount}</span>
-                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Films vus</span>
-              </div>
-              <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>📺</span>
-                <span style={{ fontSize: '20px', fontWeight: '800', color: '#FFF' }}>{stats.tvCount}</span>
-                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Séries vues</span>
-              </div>
-              <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>✨</span>
-                <span style={{ fontSize: '20px', fontWeight: '800', color: '#4ADE80' }}>{likedMovies.length}</span>
-                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Films validés</span>
-              </div>
-              <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>❌</span>
-                <span style={{ fontSize: '20px', fontWeight: '800', color: '#EF4444' }}>{dislikedMovies.length}</span>
-                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Red Flags</span>
-              </div>
-            </div>
-
-            {/* BADGES & HAUTS FAITS */}
-            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px', padding: '20px', marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#C084FC', margin: '0 0 16px 0' }}>🏅 Mes Badges & Succès</h3>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.watchedCount >= 1 ? 1 : 0.3 }}>
-                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🍿</div>
-                  <div>
-                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0' }}>Premier Pas</h4>
-                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Avoir vu au moins 1 film ou série</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.moviesCount >= 10 ? 1 : 0.3 }}>
-                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🎬</div>
-                  <div>
-                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0' }}>Cinéphile Assidu</h4>
-                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Avoir visionné 10 films</p>
-                  </div>
-                </div>
-
-                <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '4px 0' }}></div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 3 ? 1 : 0.3 }}>
-                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🚀</div>
-                  <div>
-                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#60A5FA' }}>Explorateur Spatial</h4>
-                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Valider 3 œuvres d'exploration spatiale</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 5 ? 1 : 0.3 }}>
-                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>⏳</div>
-                  <div>
-                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#F472B6' }}>Voyageur Temporel</h4>
-                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Trouver 5 pépites sur le voyage dans le temps</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 10 ? 1 : 0.3 }}>
-                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>☢️</div>
-                  <div>
-                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#FBBF24' }}>Survivant de l'Apocalypse</h4>
-                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Survivre à 10 films post-apocalyptiques</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION HISTORIQUE DES SWIPES */}
-            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px', padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#EC4899', margin: 0 }}>🔥 Historique PoteCorn Party</h3>
-                <a href="/potecorn-party" style={{ fontSize: '11px', color: '#C084FC', textDecoration: 'none', fontWeight: '600' }}>Relancer →</a>
-              </div>
-              {swipes.length === 0 ? (
-                <p style={{ fontSize: '12px', color: '#A1A1AA', textAlign: 'center', margin: '20px 0' }}>Aucun film swipé avec ce compte.</p>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
-                  {swipes.map((item) => (
-                    <div key={item.id} style={{ backgroundColor: '#18181B', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
-                      <div style={{ height: '140px', backgroundColor: '#27272A', position: 'relative' }}>
-                        {item.poster_path ? (
-                          <img src={item.poster_path} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#71717A', fontSize: '10px' }}>Pas d'affiche</div>
-                        )}
-                        <span style={{ position: 'absolute', top: '6px', right: '6px', backgroundColor: item.action === 'liked' ? 'rgba(74, 222, 128, 0.9)' : 'rgba(239, 68, 68, 0.9)', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '9px', fontWeight: '900' }}>
-                          {item.action === 'liked' ? '✨' : '❌'}
-                        </span>
-                      </div>
-                      <div style={{ padding: '6px' }}>
-                        <h4 style={{ fontSize: '11px', fontWeight: '700', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
-                      </div>
-                    </div>
-                  ))}
+              {friendError && (
+                <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '8px', borderRadius: '8px', fontSize: '11px', marginBottom: '12px' }}>
+                  {friendError}
                 </div>
               )}
+
+              <form onSubmit={addFriend} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Coller l'ID de l'ami ici..." 
+                  value={friendInput} 
+                  onChange={(e) => setFriendInput(e.target.value)}
+                  style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '12px' }} 
+                />
+                <button type="submit" style={{ backgroundColor: '#3B82F6', color: '#FFF', border: 'none', padding: '10px 16px', borderRadius: '10px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>
+                  Ajouter
+                </button>
+              </form>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {friends.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: '#71717A', margin: 0 }}>Aucun ami ajouté pour l'instant.</p>
+                ) : (
+                  friends.map((f) => {
+                    const friendId = f.user_id === user.id ? f.friend_id : f.user_id;
+                    return (
+                      <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181B', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#D4D4D8' }}>Ami : {friendId.substring(0, 12)}...</span>
+                        <a href={`/potecorn-party?duo_with=${friendId}`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60A5FA', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', textDecoration: 'none' }}>
+                          Lancer Duo 🚀
+                        </a>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* FORMULAIRE DE PERSONNALISATION DU PROFIL */}
+            <form onSubmit={handleSaveProfile} style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#C084FC', margin: '0 0 16px 0' }}>✏️ Modifier mes infos</h3>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Pseudo</label>
+                <input type="text" placeholder="Ton pseudo" value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>URL de l'Avatar</label>
+                <input type="url" placeholder="https://..." value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
+              </div>
+
+              <button type="submit" disabled={savingProfile} style={{ width: '100%', backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}>
+                {savingProfile ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
+            </form>
+
+            {/* CARTE NIVEAU & XP */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px', textAlign: 'center' }}>
+              <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 4px 0' }}>Niveau {stats.level}</h2>
+              <span style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '700', textTransform: 'uppercase' }}>{stats.totalXP} XP Cumulés</span>
             </div>
 
           </div>
