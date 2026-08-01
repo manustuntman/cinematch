@@ -139,6 +139,19 @@ export default function PoteCornPartyPage() {
       if (direction === 'up') actionType = 'skipped';
       
       try {
+        // Extraction textuelle des genres TMDB (ex: IDs convertis ou récupérés)
+        // On associe les IDs de genres courants TMDB pour l'exemple si on a le tableau genre_ids
+        const genreMap: { [key: number]: string } = {
+          28: 'Action', 12: 'Aventure', 16: 'Animation', 35: 'Comédie', 80: 'Crime',
+          99: 'Documentaire', 18: 'Drame', 10751: 'Famille', 14: 'Fantastique', 36: 'Histoire',
+          27: 'Horreur', 10402: 'Musique', 9648: 'Mystère', 10749: 'Romance', 878: 'Science-Fiction',
+          10770: 'Téléfilm', 53: 'Thriller', 10752: 'Guerre', 37: 'Western'
+        };
+
+        const movieGenres = currentMovie.genre_ids 
+          ? currentMovie.genre_ids.map((id: number) => genreMap[id]).filter(Boolean).join(', ')
+          : 'Cinéma';
+
         await supabase.from('user_swipes').insert([
           {
             user_uid: userId,
@@ -146,7 +159,8 @@ export default function PoteCornPartyPage() {
             title: currentMovie.title,
             poster_path: currentMovie.poster_path ? `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}` : null,
             action: actionType,
-            room_code: activeRoom || null
+            room_code: activeRoom || null,
+            genres: movieGenres // Enregistrement automatique des genres pour le Panthéon !
           }
         ]);
 
@@ -226,7 +240,7 @@ export default function PoteCornPartyPage() {
   const onTouchEnd = () => {
     if (!isDragging || showTrailer || showMatchModal) return;
     setIsDragging(false);
-    if (touchDeltaY < -90) handleSwipe('up'); // Swipe vers le haut pour passer
+    if (touchDeltaY < -90) handleSwipe('up');
     else if (touchDeltaX > 90) handleSwipe('right');
     else if (touchDeltaX < -90) handleSwipe('left');
     else {
