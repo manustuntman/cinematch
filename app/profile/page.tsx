@@ -11,10 +11,13 @@ export default function ProfilePage() {
     age: '',
     region: '',
     bio: '',
-    avatar_url: ''
+    avatar_url: '',
+    xp: 0
   });
   const [saving, setSaving] = useState(false);
   const [compatibilityList, setCompatibilityList] = useState<any[]>([]);
+  const [likedMoviesCount, setLikedMoviesCount] = useState(0);
+  const [favoriteGenres, setFavoriteGenres] = useState<string[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -41,7 +44,29 @@ export default function ProfilePage() {
           setProfile(profileData);
         }
 
-        // 2. Calculer la compatibilité avec les autres utilisateurs
+        // 2. Charger les swipes pour le Panthéon, les Likes et les Genres favoris
+        const { data: swipesData } = await supabase
+          .from('user_swipes')
+          .select('*')
+          .eq('user_uid', currentId);
+
+        if (swipesData) {
+          const likes = swipesData.filter(s => s.action === 'liked');
+          setLikedMoviesCount(likes.length);
+
+          const genreCounts: { [key: string]: number } = {};
+          likes.forEach(s => {
+            if (s.genres) {
+              s.genres.split(', ').forEach((g: string) => {
+                genreCounts[g] = (genreCounts[g] || 0) + 1;
+              });
+            }
+          });
+          const sortedGenres = Object.keys(genreCounts).sort((a, b) => genreCounts[b] - genreCounts[a]);
+          setFavoriteGenres(sortedGenres.slice(0, 3));
+        }
+
+        // 3. Calculer la compatibilité avec les autres utilisateurs
         calculateCompatibility(currentId);
       }
     };
@@ -51,7 +76,6 @@ export default function ProfilePage() {
 
   const calculateCompatibility = async (currentUserId: string) => {
     try {
-      // Récupérer les likes de l'utilisateur actuel
       const { data: mySwipes } = await supabase
         .from('user_swipes')
         .select('movie_id')
@@ -61,7 +85,6 @@ export default function ProfilePage() {
       if (!mySwipes || mySwipes.length === 0) return;
       const myLikedMovies = mySwipes.map(s => s.movie_id);
 
-      // Récupérer tous les profils et leurs swipes
       const { data: allProfiles } = await supabase
         .from('profiles')
         .select('id, username, region')
@@ -74,13 +97,11 @@ export default function ProfilePage() {
 
       if (!allProfiles || !allSwipes) return;
 
-      // Calcul du pourcentage de films en commun
       const compatResults = allProfiles.map(otherUser => {
         const otherLikes = allSwipes.filter(s => s.user_uid === otherUser.id).map(s => s.movie_id);
         if (otherLikes.length === 0) return { ...otherUser, score: 0 };
 
         const commonMovies = myLikedMovies.filter(id => otherLikes.includes(id));
-        // Calcul d'un pourcentage basé sur le max de films aimés
         const score = Math.round((commonMovies.length / Math.max(myLikedMovies.length, otherLikes.length)) * 100);
 
         return {
@@ -89,7 +110,6 @@ export default function ProfilePage() {
         };
       });
 
-      // Trier du plus compatible au moins compatible
       compatResults.sort((a, b) => b.score - a.score);
       setCompatibilityList(compatResults);
 
@@ -126,10 +146,14 @@ export default function ProfilePage() {
     setSaving(false);
   };
 
+  // Calcul du niveau d'XP et des badges
+  const userXp = profile.xp || (likedMoviesCount * 50);
+  const userLevel = Math.floor(userXp / 500) + 1;
+
   if (!isMounted) return null;
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <main style={{ minHeight: '100vh', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', paddingBottom: '80px' }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         
         {/* EN-TÊTE */}
@@ -143,8 +167,47 @@ export default function ProfilePage() {
           <div style={{ width: '60px' }}></div>
         </div>
 
-        {/* FORMULAIRE DE PROFIL */}
-        <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '24px', marginBottom: '30px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+        {/* PANTHÉON & STATISTIQUES (XP & NIVEAU) */}
+        <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(147, 51, 234, 0.4)', borderRadius: '24px', padding: '20px', marginBottom: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '22px' }}>🏛️</span>
+              <h2 style={{ fontSize: '15px', fontWeight: '800', color: '#C084FC', margin: 0 }}>Panthéon Cinéphile</h2>
+            </div>
+            <span style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '800', backgroundColor: 'rgba(251, 191, 36, 0.1)', padding: '4px 10px', borderRadius: '10px', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
+              Niveau {userLevel} • {userXp} XP ⚡
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ backgroundColor: '#27272A', padding: '14px', borderRadius: '14px', textAlign: 'center' }}>
+              <span style={{ fontSize: '20px', fontWeight: '900', color: '#4ADE80', display: 'block' }}>{likedMoviesCount}</span>
+              <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Films Validés (Likes)</span>
+            </div>
+            <div style={{ backgroundColor: '#27272A', padding: '14px', borderRadius: '14px', textAlign: 'center' }}>
+              <span style={{ fontSize: '20px', fontWeight: '900', color: '#FBBF24', display: 'block' }}>{userLevel}</span>
+              <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Niveau Actuel</span>
+            </div>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>Genres Favoris :</span>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {favoriteGenres.length === 0 ? (
+                <span style={{ fontSize: '12px', color: '#71717A' }}>Swipe des films pour découvrir tes genres favoris !</span>
+              ) : (
+                favoriteGenres.map((genre) => (
+                  <span key={genre} style={{ backgroundColor: 'rgba(147, 51, 234, 0.2)', border: '1px solid rgba(147, 51, 234, 0.4)', color: '#D8B4FE', padding: '4px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '700' }}>
+                    {genre}
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* FORMULAIRE DE PROFIL D'ORIGINE */}
+        <div style={{ backgroundColor: '#18181B', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '24px', marginBottom: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
           <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
             <div>
