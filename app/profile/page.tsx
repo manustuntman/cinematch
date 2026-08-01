@@ -13,6 +13,9 @@ export default function ProfilePage() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
+  // Mode Édition du profil
+  const [isEditing, setIsEditing] = useState(false);
+
   // Profil
   const [username, setUsername] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -23,9 +26,9 @@ export default function ProfilePage() {
   const [isPublic, setIsPublic] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // Amis
+  // Amis (Recherche par pseudo)
   const [friends, setFriends] = useState<any[]>([]);
-  const [friendInput, setFriendInput] = useState('');
+  const [friendPseudoInput, setFriendPseudoInput] = useState('');
   const [friendError, setFriendError] = useState('');
 
   // Stats & Données
@@ -131,7 +134,18 @@ export default function ProfilePage() {
         .eq('status', 'accepted');
 
       if (friendshipsData) {
-        setFriends(friendshipsData);
+        // Récupérer les détails des profils des amis pour afficher leurs vrais pseudos
+        const friendIds = friendshipsData.map(f => f.user_id === userId ? f.friend_id : f.user_id);
+        if (friendIds.length > 0) {
+          const { data: friendProfiles } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', friendIds);
+          
+          setFriends(friendProfiles || []);
+        } else {
+          setFriends([]);
+        }
       }
 
     } catch (err) {
@@ -187,6 +201,7 @@ export default function ProfilePage() {
       const { error } = await supabase.from('profiles').upsert(updates);
       if (error) throw error;
       alert('Profil mis à jour avec succès ! ✨');
+      setIsEditing(false); // Ferme le mode édition après enregistrement
     } catch (err) {
       console.error('Erreur sauvegarde profil:', err);
       alert('Erreur lors de la sauvegarde.');
@@ -194,32 +209,46 @@ export default function ProfilePage() {
     setSavingProfile(false);
   };
 
-  const addFriend = async (e: React.FormEvent) => {
+  // Ajouter un ami par son PSEUDO
+  const addFriendByPseudo = async (e: React.FormEvent) => {
     e.preventDefault();
     setFriendError('');
-    if (!friendInput.trim() || !user) return;
-
-    if (friendInput.trim() === user.id) {
-      setFriendError("Vous ne pouvez pas vous ajouter vous-même !");
-      return;
-    }
+    if (!friendPseudoInput.trim() || !user) return;
 
     try {
-      const { error } = await supabase.from('friendships').insert([
+      // 1. Chercher le profil par son username
+      const { data: targetProfile, error: searchError } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .ilike('username', friendPseudoInput.trim())
+        .single();
+
+      if (searchError || !targetProfile) {
+        setFriendError("Aucun utilisateur trouvé avec ce pseudo.");
+        return;
+      }
+
+      if (targetProfile.id === user.id) {
+        setFriendError("Vous ne pouvez pas vous ajouter vous-même !");
+        return;
+      }
+
+      // 2. Insérer l'amitié
+      const { error: insertError } = await supabase.from('friendships').insert([
         {
           user_id: user.id,
-          friend_id: friendInput.trim(),
+          friend_id: targetProfile.id,
           status: 'accepted'
         }
       ]);
 
-      if (error) throw error;
-      alert('Ami ajouté avec succès !');
-      setFriendInput('');
+      if (insertError) throw insertError;
+      alert(`Ami ${targetProfile.username} ajouté avec succès ! 🎉`);
+      setFriendPseudoInput('');
       fetchUserData(user.id);
     } catch (err) {
       console.error('Erreur ajout ami:', err);
-      setFriendError("Impossible d'ajouter cet utilisateur (Vérifiez l'ID).");
+      setFriendError("Erreur lors de l'ajout de cet ami.");
     }
   };
 
@@ -274,36 +303,109 @@ export default function ProfilePage() {
             </button>
           </div>
         ) : (
-          /* PROFIL CONNECTÉ */
+          /* PROFIL CONNECTÉ (CARTE D'IDENTITÉ & STRUCTURE) */
           <div>
-            {/* COMPTE & ID UNIQUE */}
-            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px 20px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: '10px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px' }}>Mon ID unique (à partager)</span>
-                <p style={{ fontSize: '11px', fontWeight: '700', color: '#C084FC', margin: '2px 0 0 0', fontFamily: 'monospace' }}>{user.id}</p>
+            
+            {/* CARTE D'IDENTITÉ DU PROFIL */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px', position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#27272A', overflow: 'hidden', border: '3px solid #C084FC', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '32px' }}>👤</span>
+                  )}
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 4px 0', color: '#FFF' }}>
+                    {username || 'Cinéphile Anonyme'}
+                  </h2>
+                  <p style={{ fontSize: '12px', color: '#A1A1AA', margin: '0 0 8px 0' }}>{user.email}</p>
+                  
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {age && <span style={{ backgroundColor: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', color: '#D4D4D8' }}>🎂 {age} ans</span>}
+                    {gender && <span style={{ backgroundColor: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', color: '#D4D4D8' }}>{gender === 'male' ? '👨 Homme' : gender === 'female' ? '👩 Femme' : '🧑 Autre'}</span>}
+                    {(country || region) && <span style={{ backgroundColor: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', color: '#D4D4D8' }}>📍 {region ? `${region}, ` : ''}{country}</span>}
+                  </div>
+                </div>
               </div>
-              <button onClick={handleLogout} style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                Déconnexion
-              </button>
+
+              {/* BOUTONS ACTIONS (MODIFIER & DÉCO) */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                <button onClick={() => setIsEditing(!isEditing)} style={{ backgroundColor: 'rgba(192, 132, 252, 0.1)', color: '#C084FC', border: '1px solid rgba(192, 132, 252, 0.3)', padding: '6px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                  {isEditing ? 'Fermer' : '✏️ Modifier mon profil'}
+                </button>
+                <button onClick={handleLogout} style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                  Déconnexion
+                </button>
+              </div>
+
+              {/* FORMULAIRE DE MODIFICATION (VISIBLE UNIQUEMENT SI IS_EDITING = TRUE) */}
+              {isEditing && (
+                <form onSubmit={handleSaveProfile} style={{ marginTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.15)', paddingTop: '20px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#C084FC', marginBottom: '12px' }}>Mettre à jour mes informations</h3>
+                  
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Pseudo</label>
+                    <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>URL de l'Avatar</label>
+                    <input type="url" placeholder="https://..." value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Âge</label>
+                      <input type="number" value={age} onChange={(e) => setAge(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Sexe</label>
+                      <select value={gender} onChange={(e) => setGender(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }}>
+                        <option value="">Non spécifié</option>
+                        <option value="male">Homme</option>
+                        <option value="female">Femme</option>
+                        <option value="other">Autre</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Pays</label>
+                      <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Région / Ville</label>
+                      <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+
+                  <button type="submit" disabled={savingProfile} style={{ width: '100%', backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}>
+                    {savingProfile ? 'Enregistrement...' : 'Enregistrer'}
+                  </button>
+                </form>
+              )}
             </div>
 
-            {/* GESTION DES AMIS */}
-            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#3B82F6', margin: '0 0 12px 0' }}>👥 Mes Amis & Duo</h3>
-              <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '16px' }}>Ajoute l'ID d'un ami pour lancer des sessions Duo directes avec lui.</p>
+            {/* BANDEAU AMIS & DUO (PAR PSEUDO) */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '24px', padding: '20px', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#3B82F6', margin: '0 0 10px 0' }}>👥 Mes Amis & Duo</h3>
 
               {friendError && (
-                <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '8px', borderRadius: '8px', fontSize: '11px', marginBottom: '12px' }}>
+                <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', color: '#EF4444', padding: '8px', borderRadius: '8px', fontSize: '11px', marginBottom: '10px' }}>
                   {friendError}
                 </div>
               )}
 
-              <form onSubmit={addFriend} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <form onSubmit={addFriendByPseudo} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                 <input 
                   type="text" 
-                  placeholder="Coller l'ID de l'ami ici..." 
-                  value={friendInput} 
-                  onChange={(e) => setFriendInput(e.target.value)}
+                  placeholder="Entrer le pseudo d'un ami..." 
+                  value={friendPseudoInput} 
+                  onChange={(e) => setFriendPseudoInput(e.target.value)}
                   style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '12px' }} 
                 />
                 <button type="submit" style={{ backgroundColor: '#3B82F6', color: '#FFF', border: 'none', padding: '10px 16px', borderRadius: '10px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>
@@ -315,90 +417,133 @@ export default function ProfilePage() {
                 {friends.length === 0 ? (
                   <p style={{ fontSize: '12px', color: '#71717A', margin: 0 }}>Aucun ami ajouté pour l'instant.</p>
                 ) : (
-                  friends.map((f) => {
-                    const friendId = f.user_id === user.id ? f.friend_id : f.user_id;
-                    return (
-                      <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181B', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#D4D4D8' }}>Ami : {friendId.substring(0, 12)}...</span>
-                        <a href={`/potecorn-party?duo_with=${friendId}`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60A5FA', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', textDecoration: 'none' }}>
-                          Lancer Duo 🚀
-                        </a>
-                      </div>
-                    );
-                  })
+                  friends.map((friend) => (
+                    <div key={friend.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181B', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#D4D4D8' }}>👤 {friend.username || 'Ami'}</span>
+                      <a href={`/potecorn-party?duo_with=${friend.id}`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60A5FA', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', textDecoration: 'none' }}>
+                        Lancer Duo 🚀
+                      </a>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
 
-            {/* FORMULAIRE DE PERSONNALISATION DU PROFIL COMPLET */}
-            <form onSubmit={handleSaveProfile} style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#C084FC', margin: '0 0 16px 0' }}>✏️ Personnaliser mon Profil</h3>
-
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#27272A', overflow: 'hidden', border: '2px solid #C084FC', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ fontSize: '24px' }}>👤</span>
-                  )}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>URL de l'Avatar (Image)</label>
-                  <input type="url" placeholder="https://exemple.com/image.jpg" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Pseudo</label>
-                  <input type="text" placeholder="Ton pseudo" value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Âge</label>
-                  <input type="number" placeholder="Ex: 28" value={age} onChange={(e) => setAge(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Sexe</label>
-                  <select value={gender} onChange={(e) => setGender(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }}>
-                    <option value="">Non spécifié</option>
-                    <option value="male">Homme</option>
-                    <option value="female">Femme</option>
-                    <option value="other">Autre</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Pays</label>
-                  <input type="text" placeholder="Ex: France" value={country} onChange={(e) => setCountry(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginBottom: '4px' }}>Région / Ville</label>
-                <input type="text" placeholder="Ex: Hauts-de-France" value={region} onChange={(e) => setRegion(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                <input type="checkbox" id="isPublic" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: '#EC4899' }} />
-                <label htmlFor="isPublic" style={{ fontSize: '13px', color: '#D4D4D8', cursor: 'pointer' }}>
-                  Rendre mon profil public
-                </label>
-              </div>
-
-              <button type="submit" disabled={savingProfile} style={{ width: '100%', backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}>
-                {savingProfile ? 'Enregistrement...' : 'Enregistrer les modifications'}
-              </button>
-            </form>
-
             {/* CARTE NIVEAU & XP */}
-            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px', textAlign: 'center' }}>
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px', textAlign: 'center', boxShadow: '0 10px 30px -5px rgba(147, 51, 234, 0.2)' }}>
               <div style={{ width: '70px', height: '70px', borderRadius: '50%', backgroundColor: '#9333EA', margin: '0 auto 12px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', border: '3px solid #C084FC' }}>
                 🎭
               </div>
               <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 4px 0' }}>Niveau {stats.level}</h2>
               <span style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{stats.totalXP} XP Cumulés</span>
+              <div style={{ marginTop: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', height: '10px', borderRadius: '10px', overflow: 'hidden', position: 'relative' }}>
+                <div style={{ width: `${stats.xpProgress}%`, height: '100%', backgroundColor: '#9333EA', transition: 'width 0.4s ease' }} />
+              </div>
+              <span style={{ fontSize: '10px', color: '#A1A1AA', marginTop: '6px', display: 'block' }}>Prochain niveau dans {500 - (stats.totalXP % 500)} XP</span>
+            </div>
+
+            {/* GRILLE DES STATISTIQUES */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>🎬</span>
+                <span style={{ fontSize: '20px', fontWeight: '800', color: '#FFF' }}>{stats.moviesCount}</span>
+                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Films vus</span>
+              </div>
+              <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>📺</span>
+                <span style={{ fontSize: '20px', fontWeight: '800', color: '#FFF' }}>{stats.tvCount}</span>
+                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Séries vues</span>
+              </div>
+              <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>✨</span>
+                <span style={{ fontSize: '20px', fontWeight: '800', color: '#4ADE80' }}>{likedMovies.length}</span>
+                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Films validés</span>
+              </div>
+              <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+                <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>❌</span>
+                <span style={{ fontSize: '20px', fontWeight: '800', color: '#EF4444' }}>{dislikedMovies.length}</span>
+                <span style={{ fontSize: '11px', color: '#A1A1AA', display: 'block', marginTop: '2px' }}>Red Flags</span>
+              </div>
+            </div>
+
+            {/* BADGES & HAUTS FAITS */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px', padding: '20px', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#C084FC', margin: '0 0 16px 0' }}>🏅 Mes Badges & Succès</h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.watchedCount >= 1 ? 1 : 0.3 }}>
+                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🍿</div>
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0' }}>Premier Pas</h4>
+                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Avoir vu au moins 1 film ou série</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.moviesCount >= 10 ? 1 : 0.3 }}>
+                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🎬</div>
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0' }}>Cinéphile Assidu</h4>
+                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Avoir visionné 10 films</p>
+                  </div>
+                </div>
+
+                <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '4px 0' }}></div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 3 ? 1 : 0.3 }}>
+                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🚀</div>
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#60A5FA' }}>Explorateur Spatial</h4>
+                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Valider 3 œuvres d'exploration spatiale</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 5 ? 1 : 0.3 }}>
+                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>⏳</div>
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#F472B6' }}>Voyageur Temporel</h4>
+                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Trouver 5 pépites sur le voyage dans le temps</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 10 ? 1 : 0.3 }}>
+                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>☢️</div>
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#FBBF24' }}>Survivant de l'Apocalypse</h4>
+                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Survivre à 10 films post-apocalyptiques</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* HISTORIQUE DES SWIPES */}
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px', padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#EC4899', margin: 0 }}>🔥 Historique PoteCorn Party</h3>
+                <a href="/potecorn-party" style={{ fontSize: '11px', color: '#C084FC', textDecoration: 'none', fontWeight: '600' }}>Relancer →</a>
+              </div>
+              {swipes.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#A1A1AA', textAlign: 'center', margin: '20px 0' }}>Aucun film swipé avec ce compte.</p>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+                  {swipes.map((item) => (
+                    <div key={item.id} style={{ backgroundColor: '#18181B', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+                      <div style={{ height: '140px', backgroundColor: '#27272A', position: 'relative' }}>
+                        {item.poster_path ? (
+                          <img src={item.poster_path} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#71717A', fontSize: '10px' }}>Pas d'affiche</div>
+                        )}
+                        <span style={{ position: 'absolute', top: '6px', right: '6px', backgroundColor: item.action === 'liked' ? 'rgba(74, 222, 128, 0.9)' : 'rgba(239, 68, 68, 0.9)', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '9px', fontWeight: '900' }}>
+                          {item.action === 'liked' ? '✨' : '❌'}
+                        </span>
+                      </div>
+                      <div style={{ padding: '6px' }}>
+                        <h4 style={{ fontSize: '11px', fontWeight: '700', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>
