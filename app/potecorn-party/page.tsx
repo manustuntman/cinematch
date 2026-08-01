@@ -18,7 +18,7 @@ export default function PoteCornPartyPage() {
   const [swipeQueue, setSwipeQueue] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loadingMovies, setLoadingMovies] = useState(false);
-  const [animatingDir, setAnimatingDir] = useState<'left' | 'right' | null>(null);
+  const [animatingDir, setAnimatingDir] = useState<'left' | 'right' | 'up' | null>(null);
 
   // Fonctionnalités précédentes
   const [isFamilyMode, setIsFamilyMode] = useState(false);
@@ -28,7 +28,9 @@ export default function PoteCornPartyPage() {
 
   // Variables tactile
   const [touchStartX, setTouchStartX] = useState<number>(0);
+  const [touchStartY, setTouchStartY] = useState<number>(0);
   const [touchDeltaX, setTouchDeltaX] = useState<number>(0);
+  const [touchDeltaY, setTouchDeltaY] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
@@ -40,7 +42,6 @@ export default function PoteCornPartyPage() {
       if (session) {
         setUserId(session.user.id);
       } else {
-        // Fallback si non connecté (mode invité)
         let storedId = localStorage.getItem('potecorn_uid');
         if (!storedId) {
           storedId = 'user_' + Math.random().toString(36).substr(2, 9);
@@ -125,7 +126,7 @@ export default function PoteCornPartyPage() {
     }
   };
 
-  const handleSwipe = async (direction: 'left' | 'right') => {
+  const handleSwipe = async (direction: 'left' | 'right' | 'up') => {
     if (animatingDir) return;
     setAnimatingDir(direction);
     setIsDragging(false);
@@ -133,7 +134,9 @@ export default function PoteCornPartyPage() {
 
     const currentMovie = swipeQueue[currentIndex];
     if (currentMovie && userId) {
-      const actionType = direction === 'right' ? 'liked' : 'disliked';
+      let actionType = 'liked';
+      if (direction === 'left') actionType = 'disliked';
+      if (direction === 'up') actionType = 'skipped';
       
       try {
         await supabase.from('user_swipes').insert([
@@ -148,7 +151,7 @@ export default function PoteCornPartyPage() {
         ]);
 
         if (actionType === 'liked' && activeRoom) {
-          const { data: matchData, error: matchError } = await supabase
+          const { data: matchData } = await supabase
             .from('user_swipes')
             .select('*')
             .eq('room_code', activeRoom)
@@ -176,6 +179,7 @@ export default function PoteCornPartyPage() {
     setTimeout(() => {
       setAnimatingDir(null);
       setTouchDeltaX(0);
+      setTouchDeltaY(0);
       if (currentIndex < swipeQueue.length - 1) {
         setCurrentIndex(prev => prev + 1);
       } else {
@@ -205,23 +209,30 @@ export default function PoteCornPartyPage() {
   const onTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
     if (showTrailer || showMatchModal) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     setTouchStartX(clientX);
+    setTouchStartY(clientY);
     setIsDragging(true);
   };
 
   const onTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
     if (!isDragging || showTrailer || showMatchModal) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const delta = clientX - touchStartX;
-    setTouchDeltaX(delta);
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setTouchDeltaX(clientX - touchStartX);
+    setTouchDeltaY(clientY - touchStartY);
   };
 
   const onTouchEnd = () => {
     if (!isDragging || showTrailer || showMatchModal) return;
     setIsDragging(false);
-    if (touchDeltaX > 90) handleSwipe('right');
+    if (touchDeltaY < -90) handleSwipe('up'); // Swipe vers le haut pour passer
+    else if (touchDeltaX > 90) handleSwipe('right');
     else if (touchDeltaX < -90) handleSwipe('left');
-    else setTouchDeltaX(0);
+    else {
+      setTouchDeltaX(0);
+      setTouchDeltaY(0);
+    }
   };
 
   if (!isMounted) return null;
@@ -235,9 +246,11 @@ export default function PoteCornPartyPage() {
       <style jsx global>{`
         @keyframes swipeLeft { to { transform: translateX(-120vw) rotate(-30deg); opacity: 0; } }
         @keyframes swipeRight { to { transform: translateX(120vw) rotate(30deg); opacity: 0; } }
+        @keyframes swipeUp { to { transform: translateY(-120vh) scale(0.9); opacity: 0; } }
         @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .animate-swipe-left { animation: swipeLeft 0.3s forwards ease-in; }
         .animate-swipe-right { animation: swipeRight 0.3s forwards ease-in; }
+        .animate-swipe-up { animation: swipeUp 0.3s forwards ease-in; }
         .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
 
@@ -347,20 +360,21 @@ export default function PoteCornPartyPage() {
                 <div style={{ textAlign: 'center', color: '#A1A1AA' }}><span style={{ fontSize: '40px', display: 'block', marginBottom: '16px' }}>🍿</span><p>Recherche de pépites...</p></div>
               ) : currentMovie ? (
                 <div
-                  className={animatingDir === 'left' ? 'animate-swipe-left' : animatingDir === 'right' ? 'animate-swipe-right' : ''}
+                  className={animatingDir === 'left' ? 'animate-swipe-left' : animatingDir === 'right' ? 'animate-swipe-right' : animatingDir === 'up' ? 'animate-swipe-up' : ''}
                   onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
                   onMouseDown={onTouchStart} onMouseMove={onTouchMove} onMouseUp={onTouchEnd} onMouseLeave={onTouchEnd}
                   style={{ 
                     width: '100%', maxWidth: '340px', backgroundColor: '#18181B', borderRadius: '24px', overflow: 'hidden',
                     border: '1px solid rgba(255,255,255,0.15)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
                     position: 'absolute', cursor: 'grab', userSelect: 'none', touchAction: 'none',
-                    transform: animatingDir ? undefined : `translateX(${touchDeltaX}px) rotate(${rotation}deg)`,
+                    transform: animatingDir ? undefined : `translate(${touchDeltaX}px, ${touchDeltaY}px) rotate(${rotation}deg)`,
                     transition: isDragging ? 'none' : 'transform 0.2s ease',
                     zIndex: 10
                   }}
                 >
                   {touchDeltaX > 20 && <div style={{ position: 'absolute', top: '30px', left: '20px', zIndex: 20, border: '4px solid #4ADE80', color: '#4ADE80', padding: '8px 16px', borderRadius: '12px', fontSize: '20px', fontWeight: '900', transform: 'rotate(-15deg)', backgroundColor: 'rgba(0,0,0,0.7)', opacity: Math.min(touchDeltaX / 80, 1) }}>✨ JE VALIDE</div>}
                   {touchDeltaX < -20 && <div style={{ position: 'absolute', top: '30px', right: '20px', zIndex: 20, border: '4px solid #EF4444', color: '#EF4444', padding: '8px 16px', borderRadius: '12px', fontSize: '20px', fontWeight: '900', transform: 'rotate(15deg)', backgroundColor: 'rgba(0,0,0,0.7)', opacity: Math.min(Math.abs(touchDeltaX) / 80, 1) }}>❌ RED FLAG</div>}
+                  {touchDeltaY < -20 && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 20, border: '4px solid #3B82F6', color: '#3B82F6', padding: '8px 16px', borderRadius: '12px', fontSize: '20px', fontWeight: '900', backgroundColor: 'rgba(0,0,0,0.8)', opacity: Math.min(Math.abs(touchDeltaY) / 80, 1) }}>⏭️ PAS CONNU</div>}
 
                   <div style={{ position: 'relative', height: '460px' }}>
                     {showTrailer && trailerKey ? (
@@ -396,9 +410,10 @@ export default function PoteCornPartyPage() {
             </div>
 
             {!loadingMovies && currentMovie && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', paddingBottom: '20px', marginTop: '20px' }}>
-                <button onClick={() => handleSwipe('left')} style={{ width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '2px solid #EF4444', color: '#EF4444', fontSize: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: '20' }}>❌</button>
-                <button onClick={() => handleSwipe('right')} style={{ width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '2px solid #4ADE80', color: '#4ADE80', fontSize: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: '20' }}>✨</button>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', paddingBottom: '20px', marginTop: '20px' }}>
+                <button onClick={() => handleSwipe('left')} style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '2px solid #EF4444', color: '#EF4444', fontSize: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 20 }}>❌</button>
+                <button onClick={() => handleSwipe('up')} style={{ padding: '10px 18px', borderRadius: '20px', backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '2px solid #3B82F6', color: '#60A5FA', fontSize: '13px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 20 }}>⏭️ Passer</button>
+                <button onClick={() => handleSwipe('right')} style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '2px solid #4ADE80', color: '#4ADE80', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 20 }}>✨</button>
               </div>
             )}
           </div>
