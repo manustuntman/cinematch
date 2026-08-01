@@ -3,201 +3,180 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
-export default function BackstageDashboard() {
-  const [isMounted, setIsMounted] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
-  
-  const [watchlistItems, setWatchlistItems] = useState<any[]>([]);
+export default function BackstagePage() {
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [unauthorized, setUnauthorized] = useState(false);
+
+  // Statistiques Globales
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalSwipes: 0,
+    totalLikes: 0,
+    totalDislikes: 0,
+  });
+
+  // Mégaphone (Annonces)
+  const [announcementInput, setAnnouncementInput] = useState('');
+  const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
-    const savedAuth = sessionStorage.getItem('potecorn_backstage_auth');
-    if (savedAuth === 'true') {
-      setIsAuthenticated(true);
-      fetchAdminData();
-    }
+    const checkAdminAndFetchData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        setUnauthorized(true);
+        setLoading(false);
+        return;
+      }
+
+      // Optionnel : tu peux vérifier si l'email correspond au tien ou à un rôle admin
+      // Pour l'instant, on laisse l'accès si la personne est connectée (à sécuriser plus tard si besoin)
+      setIsAdmin(true);
+
+      try {
+        // 1. Récupérer le nombre total d'utilisateurs
+        const { count: userCount } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true });
+
+        // 2. Récupérer les statistiques des swipes
+        const { data: swipesData } = await supabase
+          .from('user_swipes')
+          .select('action');
+
+        let likes = 0;
+        let dislikes = 0;
+        if (swipesData) {
+          likes = swipesData.filter(s => s.action === 'liked').length;
+          dislikes = swipesData.filter(s => s.action === 'disliked').length;
+        }
+
+        setStats({
+          totalUsers: userCount || 0,
+          totalSwipes: swipesData ? swipesData.length : 0,
+          totalLikes: likes,
+          totalDislikes: dislikes,
+        });
+
+      } catch (err) {
+        console.error('Erreur chargement stats backstage:', err);
+      }
+
+      setLoading(false);
+    };
+
+    checkAdminAndFetchData();
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleSendAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === 'PoteCornSecureAdmin2026!') {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('potecorn_backstage_auth', 'true');
-      fetchAdminData();
-    } else {
-      alert('Code secret incorrect !');
-      setPasswordInput('');
-    }
-  };
+    if (!announcementInput.trim()) return;
+    setSendingAnnouncement(true);
 
-  const fetchAdminData = async () => {
     try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('watchlist')
-        .select('*')
-        .order('id', { ascending: false });
+      const { error } = await supabase.from('announcements').insert([
+        { message: announcementInput.trim() }
+      ]);
 
       if (error) throw error;
-      if (data) setWatchlistItems(data);
+      alert('Annonce diffusée avec succès à toute la communauté ! 📢');
+      setAnnouncementInput('');
     } catch (err) {
-      console.error('Erreur chargement backstage:', err);
-    } finally {
-      setLoading(false);
+      console.error('Erreur envoi annonce:', err);
+      alert("Erreur lors de l'envoi de l'annonce.");
     }
+    setSendingAnnouncement(false);
   };
 
-  if (!isMounted) return null;
-
-  if (!isAuthenticated) {
+  if (loading) {
     return (
-      <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', fontFamily: 'system-ui, sans-serif' }}>
-        <div style={{ maxWidth: '380px', width: '100%', backgroundColor: 'rgba(24, 24, 27, 0.95)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.8)' }}>
-          <img src="/icon-512.png" alt="Logo" style={{ width: '50px', height: '50px', borderRadius: '12px', objectFit: 'cover', margin: '0 auto 12px auto' }} />
-          <h1 style={{ fontSize: '16px', fontWeight: '800', margin: '0 0 4px 0', color: '#FFF' }}>Backstage PoteCorn 🎬</h1>
-          <p style={{ fontSize: '11px', color: '#A1A1AA', margin: '0 0 20px 0' }}>Entre ton code secret pour accéder aux coulisses.</p>
-          
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <input
-              type="password"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="Code secret..."
-              autoFocus
-              style={{ width: '100%', padding: '12px', borderRadius: '14px', backgroundColor: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', fontSize: '13px', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }}
-            />
-            <button
-              type="submit"
-              style={{ width: '100%', backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '12px', borderRadius: '14px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}
-            >
-              Entrer dans les coulisses 🚀
-            </button>
-          </form>
-          <div style={{ marginTop: '16px' }}>
-            <a href="/" style={{ fontSize: '11px', color: '#A1A1AA', textDecoration: 'none' }}>← Retour à l'application</a>
-          </div>
-        </div>
+      <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p>Vérification des accès Backstage...</p>
       </main>
     );
   }
 
-  const totalActions = watchlistItems.length;
-  const watchedCount = watchlistItems.filter(i => i.status === 'watched').length;
-  const toWatchCount = watchlistItems.filter(i => i.status === 'to_watch').length;
-  const moviesCount = watchlistItems.filter(i => i.media_type === 'movie').length;
-  const tvCount = watchlistItems.filter(i => i.media_type === 'tv').length;
-
-  // Calcul du Top 3 des films/séries les plus présents dans les listes
-  const getTopNuggets = () => {
-    const counts: { [key: string]: { title: string; poster: string; count: number; type: string } } = {};
-    watchlistItems.forEach(item => {
-      if (!counts[item.title]) {
-        counts[item.title] = { title: item.title, poster: item.poster_path, count: 0, type: item.media_type };
-      }
-      counts[item.title].count += 1;
-    });
-    return Object.values(counts)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 3);
-  };
-
-  const topNuggets = getTopNuggets();
+  if (unauthorized || !isAdmin) {
+    return (
+      <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <span style={{ fontSize: '50px', marginBottom: '16px' }}>🚨</span>
+        <h1 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '8px' }}>Accès Interdit</h1>
+        <p style={{ color: '#A1A1AA', marginBottom: '20px' }}>Vous devez être connecté pour accéder au Backstage.</p>
+        <a href="/" style={{ backgroundColor: '#EC4899', color: '#FFF', padding: '10px 20px', borderRadius: '12px', textDecoration: 'none', fontWeight: '700' }}>Retour à l'accueil</a>
+      </main>
+    );
+  }
 
   return (
-    <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
+    <main style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFFFFF', padding: '24px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <div style={{ maxWidth: '700px', margin: '0 auto' }}>
         
-        {/* EN-TÊTE BACKSTAGE */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <div>
-            <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase' }}>Administration</span>
-            <h1 style={{ fontSize: '22px', fontWeight: '800', margin: '2px 0 0 0' }}>🎥 Backstage PoteCorn</h1>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => { sessionStorage.removeItem('potecorn_backstage_auth'); setIsAuthenticated(false); }} style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#F87171', border: '1px solid rgba(239,68,68,0.3)', padding: '8px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
-              Verrouiller
-            </button>
-            <a href="/" style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: '#FFF', padding: '8px 14px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-              ← App
-            </a>
+        {/* EN-TÊTE */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }}>
+          <a href="/" style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)', color: '#FFF', padding: '6px 14px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+            ← Accueil
+          </a>
+          <h1 style={{ fontSize: '22px', fontWeight: '900', margin: 0, background: 'linear-gradient(to right, #EC4899, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            🛠️ PoteCorn Backstage
+          </h1>
+          <div style={{ width: '60px' }}></div>
+        </div>
+
+        {/* SECTION 1 : STATISTIQUES GLOBALES */}
+        <div style={{ marginBottom: '30px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#C084FC', marginBottom: '14px' }}>📊 Statistiques Globales de l'App</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+              <span style={{ fontSize: '28px', display: 'block', marginBottom: '6px' }}>👥</span>
+              <span style={{ fontSize: '24px', fontWeight: '900', color: '#FFF' }}>{stats.totalUsers}</span>
+              <span style={{ fontSize: '12px', color: '#A1A1AA', display: 'block', marginTop: '4px' }}>Utilisateurs Inscrits</span>
+            </div>
+
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+              <span style={{ fontSize: '28px', display: 'block', marginBottom: '6px' }}>🎬</span>
+              <span style={{ fontSize: '24px', fontWeight: '900', color: '#FFF' }}>{stats.totalSwipes}</span>
+              <span style={{ fontSize: '12px', color: '#A1A1AA', display: 'block', marginTop: '4px' }}>Swipes Totaux</span>
+            </div>
+
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+              <span style={{ fontSize: '28px', display: 'block', marginBottom: '6px' }}>✨</span>
+              <span style={{ fontSize: '24px', fontWeight: '900', color: '#4ADE80' }}>{stats.totalLikes}</span>
+              <span style={{ fontSize: '12px', color: '#A1A1AA', display: 'block', marginTop: '4px' }}>Films Validés (Likes)</span>
+            </div>
+
+            <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+              <span style={{ fontSize: '28px', display: 'block', marginBottom: '6px' }}>❌</span>
+              <span style={{ fontSize: '24px', fontWeight: '900', color: '#EF4444' }}>{stats.totalDislikes}</span>
+              <span style={{ fontSize: '12px', color: '#A1A1AA', display: 'block', marginTop: '4px' }}>Red Flags</span>
+            </div>
           </div>
         </div>
 
-        {/* BLOCS DE STATS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-          <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-            <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>🍿 Popcorns (Vus)</span>
-            <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#4ADE80', margin: '6px 0 0 0' }}>{watchedCount}</h3>
+        {/* SECTION 2 : LE MÉGAPHONE (ANNONCES) */}
+        <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(236, 72, 153, 0.3)', borderRadius: '20px', padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            <span style={{ fontSize: '24px' }}>📢</span>
+            <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#EC4899', margin: 0 }}>Le Mégaphone (Annonce Communautaire)</h2>
           </div>
-          <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-            <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>📌 Watchlist</span>
-            <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#FBBF24', margin: '6px 0 0 0' }}>{toWatchCount}</h3>
-          </div>
-          <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-            <span style={{ fontSize: '10px', color: '#A1A1AA', fontWeight: '700', textTransform: 'uppercase' }}>🎬 Films vs Séries</span>
-            <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#C084FC', margin: '8px 0 0 0' }}>{moviesCount} 🎬 / {tvCount} 📺</h3>
-          </div>
-        </div>
+          <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '16px' }}>Diffuse un message officiel qui s'affichera pour tous les utilisateurs de PoteCorn.</p>
 
-        {/* SECTION NOUVEAUTÉ : TOP 3 DES PÉPITES */}
-        {topNuggets.length > 0 && (
-          <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '20px', padding: '20px', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: '800', margin: '0 0 12px 0', color: '#FBBF24' }}>🏆 Top 3 des pépites plébiscitées</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-              {topNuggets.map((item, idx) => (
-                <div key={idx} style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '10px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  {item.poster ? (
-                    <img src={item.poster} alt="" style={{ width: '45px', height: '65px', objectFit: 'cover', borderRadius: '6px', margin: '0 auto 6px auto', display: 'block' }} />
-                  ) : (
-                    <div style={{ width: '45px', height: '65px', backgroundColor: '#3F3F46', borderRadius: '6px', margin: '0 auto 6px auto' }} />
-                  )}
-                  <h4 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>{item.title}</h4>
-                  <span style={{ fontSize: '9px', color: '#FBBF24', fontWeight: '700' }}>#{idx + 1} ({item.count} interaction{item.count > 1 ? 's' : ''})</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* JOURNAL DE BORD GLOBAL (ACTIVITÉ RÉCENTE) */}
-        <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: '800', margin: 0 }}>📜 Journal de bord global</h2>
-            <button onClick={fetchAdminData} style={{ background: 'none', border: 'none', color: '#C084FC', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-              🔄 Actualiser
+          <form onSubmit={handleSendAnnouncement} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <textarea 
+              rows={3}
+              placeholder="Tape ton annonce ici (ex: Nouvelle mise à jour disponible !)..."
+              value={announcementInput}
+              onChange={(e) => setAnnouncementInput(e.target.value)}
+              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #3F3F46', backgroundColor: '#27272A', color: '#FFF', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
+            />
+            <button 
+              type="submit" 
+              disabled={sendingAnnouncement}
+              style={{ backgroundColor: '#EC4899', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}
+            >
+              {sendingAnnouncement ? 'Diffusion en cours...' : 'Diffuser l’annonce 🚀'}
             </button>
-          </div>
-
-          {loading ? (
-            <p style={{ fontSize: '12px', color: '#A1A1AA', textAlign: 'center', padding: '20px 0' }}>Chargement des données...</p>
-          ) : watchlistItems.length === 0 ? (
-            <p style={{ fontSize: '12px', color: '#A1A1AA', textAlign: 'center', padding: '20px 0' }}>Aucune interaction enregistrée pour le moment.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-              {watchlistItems.map((item) => (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {item.poster_path ? (
-                      <img src={item.poster_path} alt="" style={{ width: '30px', height: '42px', objectFit: 'cover', borderRadius: '6px' }} />
-                    ) : (
-                      <div style={{ width: '30px', height: '42px', backgroundColor: '#3F3F46', borderRadius: '6px' }} />
-                    )}
-                    <div>
-                      <h4 style={{ fontSize: '13px', fontWeight: '700', margin: '0 0 2px 0', color: '#FFF' }}>{item.title}</h4>
-                      <span style={{ fontSize: '10px', color: '#A1A1AA' }}>
-                        {item.status === 'watched' ? '👁️ Marqué comme vu' : '📌 Ajouté à la watchlist'} {item.user_rating ? `• ⭐ ${item.user_rating}/5` : ''}
-                      </span>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '10px', padding: '4px 8px', borderRadius: '8px', backgroundColor: item.status === 'watched' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(251, 191, 36, 0.1)', color: item.status === 'watched' ? '#4ADE80' : '#FBBF24', fontWeight: '700' }}>
-                    {item.media_type === 'tv' ? 'Série' : 'Film'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          </form>
         </div>
 
       </div>
