@@ -27,8 +27,9 @@ export default function ProfilePage() {
   const [isPublic, setIsPublic] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // Amis
+  // Amis & Compatibilité
   const [friends, setFriends] = useState<any[]>([]);
+  const [friendCompatibilities, setFriendCompatibilities] = useState<{ [key: string]: number }>({});
   const [friendPseudoInput, setFriendPseudoInput] = useState('');
   const [friendError, setFriendError] = useState('');
 
@@ -44,12 +45,15 @@ export default function ProfilePage() {
   });
   const [swipes, setSwipes] = useState<any[]>([]);
 
-  // Panthéon dynamique calculé à partir des likes
+  // Panthéon
   const [pantheon, setPantheon] = useState({
     topGenres: [] as string[],
     topDirectors: [] as string[],
     topActors: [] as string[],
   });
+
+  // Succès Secrets (RPG)
+  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -81,6 +85,7 @@ export default function ProfilePage() {
   const fetchUserData = async (userId: string) => {
     setLoading(true);
     try {
+      // 1. Profil
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -97,43 +102,38 @@ export default function ProfilePage() {
         setIsPublic(profileData.is_public ?? true);
       }
 
+      // 2. Watchlist & XP
       const { data: watchlistData } = await supabase.from('watchlist').select('*');
+      let watchedCountVal = 0;
+      let moviesWatchedVal = 0;
+      let tvWatchedVal = 0;
+      let calculatedXP = 0;
+
       if (watchlistData) {
         const watched = watchlistData.filter((item) => item.status === 'watched');
         const toWatch = watchlistData.filter((item) => item.status === 'to_watch');
 
-        const moviesWatched = watched.filter((item) => item.media_type === 'movie' || !item.media_type).length;
-        const tvWatched = watched.filter((item) => item.media_type === 'tv').length;
+        moviesWatchedVal = watched.filter((item) => item.media_type === 'movie' || !item.media_type).length;
+        tvWatchedVal = watched.filter((item) => item.media_type === 'tv').length;
+        watchedCountVal = watched.length;
 
         const xpFromWatched = watched.length * 100;
         const xpFromToWatch = toWatch.length * 20;
-        const calculatedXP = xpFromWatched + xpFromToWatch;
-
-        const currentLevel = Math.floor(calculatedXP / 500) + 1;
-        const progressPercentage = ((calculatedXP % 500) / 500) * 100;
-
-        setStats({
-          watchedCount: watched.length,
-          toWatchCount: toWatch.length,
-          moviesCount: moviesWatched,
-          tvCount: tvWatched,
-          totalXP: calculatedXP,
-          level: currentLevel,
-          xpProgress: progressPercentage,
-        });
+        calculatedXP = xpFromWatched + xpFromToWatch;
       }
 
-      // Swipes & Calcul automatique du Panthéon
+      // 3. Swipes & Panthéon
       const { data: swipesData } = await supabase
         .from('user_swipes')
         .select('*')
         .eq('user_uid', userId)
         .order('created_at', { ascending: false });
 
+      let userLikedIds: string[] = [];
       if (swipesData) {
         setSwipes(swipesData);
-
         const likedItems = swipesData.filter((s: any) => s.action === 'liked');
+        userLikedIds = likedItems.map((item: any) => item.movie_id);
 
         const genreCounts: { [key: string]: number } = {};
         const actorCounts: { [key: string]: number } = {};
@@ -163,6 +163,47 @@ export default function ProfilePage() {
         });
       }
 
+      // Calcul Niveau final
+      const currentLevel = Math.floor(calculatedXP / 500) + 1;
+      const progressPercentage = ((calculatedXP % 500) / 500) * 100;
+
+      setStats({
+        watchedCount: watchedCountVal,
+        toWatchCount: watchlistData ? watchlistData.filter((i) => i.status === 'to_watch').length : 0,
+        moviesCount: moviesWatchedVal,
+        tvCount: tvWatchedVal,
+        totalXP: calculatedXP,
+        level: currentLevel,
+        xpProgress: progressPercentage,
+      });
+
+      // 4. Succès Secrets (Vérification et déblocage automatique)
+      const currentHour = new Date().getHours();
+      const achievementsToCheck: { [key: string]: boolean } = {
+        'premier_pas': watchedCountVal >= 1 || (swipesData && swipesData.length > 0),
+        'noctambule': currentHour >= 2 && currentHour <= 5, // Connecté entre 2h et 5h du mat
+        'cinéphile_assidu': moviesWatchedVal >= 10,
+        'explorateur': swipesData && swipesData.filter((s: any) => s.action === 'liked').length >= 5,
+      };
+
+      // Charger les succès déjà en base
+      const { data: dbAchievements } = await supabase
+        .from('user_achievements')
+        .select('achievement_key')
+        .eq('user_id', userId);
+
+      let unlockedKeys = dbAchievements ? dbAchievements.map(a => a.achievement_key) : [];
+
+      // Vérifier et insérer les nouveaux succès débloqués
+      for (const [key, condition] of Object.entries(achievementsToCheck)) {
+        if (condition && !unlockedKeys.includes(key)) {
+          await supabase.from('user_achievements').insert([{ user_id: userId, achievement_key: key }]);
+          unlockedKeys.push(key);
+        }
+      }
+      setUnlockedAchievements(unlockedKeys);
+
+      // 5. Amis & Calcul de Compatibilité
       const { data: friendshipsData } = await supabase
         .from('friendships')
         .select('*')
@@ -178,6 +219,27 @@ export default function ProfilePage() {
             .in('id', friendIds);
           
           setFriends(friendProfiles || []);
+
+          // Calcul de la compatibilité pour chaque ami
+          const compatMap: { [key: string]: number } = {};
+          for (const fId of friendIds) {
+            const { data: friendSwipes } = await supabase
+              .from('user_swipes')
+              .select('movie_id, action')
+              .eq('user_uid', fId)
+              .eq('action', 'liked');
+
+            if (friendSwipes && friendSwipes.length > 0 && userLikedIds.length > 0) {
+              const friendLikedIds = friendSwipes.map(s => s.movie_id);
+              const commonMovies = friendLikedIds.filter(id => userLikedIds.includes(id));
+              const totalUnique = new Set([...userLikedIds, ...friendLikedIds]).size;
+              const score = Math.round((commonMovies.length / totalUnique) * 100);
+              compatMap[fId] = Math.max(score, 15); // Minimum 15% pour le fun
+            } else {
+              compatMap[fId] = 50; // Valeur par défaut si pas assez de data commune
+            }
+          }
+          setFriendCompatibilities(compatMap);
         } else {
           setFriends([]);
         }
@@ -437,7 +499,7 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* BANDEAU AMIS & DUO */}
+            {/* BANDEAU AMIS & DUO (AVEC JAUGE DE COMPATIBILITÉ) */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '24px', padding: '20px', marginBottom: '24px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#3B82F6', margin: '0 0 10px 0' }}>👥 Mes Amis & Duo</h3>
 
@@ -458,14 +520,22 @@ export default function ProfilePage() {
                 {friends.length === 0 ? (
                   <p style={{ fontSize: '12px', color: '#71717A', margin: 0 }}>Aucun ami ajouté pour l'instant.</p>
                 ) : (
-                  friends.map((friend) => (
-                    <div key={friend.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181B', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#D4D4D8' }}>👤 {friend.username || 'Ami'}</span>
-                      <a href={`/potecorn-party?duo_with=${friend.id}`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60A5FA', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', textDecoration: 'none' }}>
-                        Lancer Duo 🚀
-                      </a>
-                    </div>
-                  ))
+                  friends.map((friend) => {
+                    const compat = friendCompatibilities[friend.id] || 50;
+                    return (
+                      <div key={friend.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181B', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#D4D4D8', display: 'block' }}>👤 {friend.username || 'Ami'}</span>
+                          <span style={{ fontSize: '10px', color: compat >= 60 ? '#4ADE80' : compat >= 30 ? '#FBBF24' : '#EF4444', fontWeight: '700' }}>
+                            ⚡ Compatibilité : {compat}%
+                          </span>
+                        </div>
+                        <a href={`/potecorn-party?duo_with=${friend.id}`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60A5FA', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', textDecoration: 'none' }}>
+                          Lancer Duo 🚀
+                        </a>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -516,7 +586,6 @@ export default function ProfilePage() {
               <p style={{ fontSize: '12px', color: '#A1A1AA', marginBottom: '20px' }}>Tes préférences absolues basées sur tes swipes validés.</p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                {/* Genres Fétiches */}
                 <div style={{ backgroundColor: '#18181B', padding: '14px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <span style={{ fontSize: '11px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>🎭 Genres Favoris</span>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -528,7 +597,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Réalisateurs Fétiches */}
                 <div style={{ backgroundColor: '#18181B', padding: '14px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <span style={{ fontSize: '11px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>🎬 Réalisateurs Fétiches</span>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -540,7 +608,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Acteurs Fétiches */}
                 <div style={{ backgroundColor: '#18181B', padding: '14px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <span style={{ fontSize: '11px', color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>🌟 Acteurs / Actrices Fétiches</span>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -554,50 +621,40 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* BADGES & HAUTS FAITS */}
+            {/* QUÊTES & SUCCÈS SECRETS (RPG) */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px', padding: '20px', marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#C084FC', margin: '0 0 16px 0' }}>🏅 Mes Badges & Succès</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#C084FC', margin: '0 0 16px 0' }}>🏆 Quêtes & Succès Secrets</h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.watchedCount >= 1 ? 1 : 0.3 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: unlockedAchievements.includes('premier_pas') ? 1 : 0.3 }}>
                   <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🍿</div>
                   <div>
                     <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0' }}>Premier Pas</h4>
-                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Avoir vu au moins 1 film ou série</p>
+                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Avoir validé au moins 1 film ou série</p>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: stats.moviesCount >= 10 ? 1 : 0.3 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: unlockedAchievements.includes('noctambule') ? 1 : 0.3 }}>
+                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🌙</div>
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#60A5FA' }}>Noctambule</h4>
+                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Se connecter et valider des films tard dans la nuit (entre 2h et 5h)</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: unlockedAchievements.includes('cinéphile_assidu') ? 1 : 0.3 }}>
                   <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🎬</div>
                   <div>
-                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0' }}>Cinéphile Assidu</h4>
+                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#F472B6' }}>Cinéphile Assidu</h4>
                     <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Avoir visionné 10 films</p>
                   </div>
                 </div>
 
-                <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '4px 0' }}></div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 3 ? 1 : 0.3 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: unlockedAchievements.includes('explorateur') ? 1 : 0.3 }}>
                   <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>🚀</div>
                   <div>
-                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#60A5FA' }}>Explorateur Spatial</h4>
-                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Valider 3 œuvres d'exploration spatiale</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 5 ? 1 : 0.3 }}>
-                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>⏳</div>
-                  <div>
-                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#F472B6' }}>Voyageur Temporel</h4>
-                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Trouver 5 pépites sur le voyage dans le temps</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: likedMovies.length >= 10 ? 1 : 0.3 }}>
-                  <div style={{ fontSize: '24px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px' }}>☢️</div>
-                  <div>
-                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#FBBF24' }}>Survivant de l'Apocalypse</h4>
-                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Survivre à 10 films post-apocalyptiques</p>
+                    <h4 style={{ fontSize: '12px', fontWeight: '700', margin: '0 0 2px 0', color: '#FBBF24' }}>Explorateur de Pépites</h4>
+                    <p style={{ fontSize: '10px', color: '#A1A1AA', margin: 0 }}>Aimer 5 films lors des sessions PoteCorn</p>
                   </div>
                 </div>
               </div>
