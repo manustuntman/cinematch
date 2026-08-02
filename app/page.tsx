@@ -1556,7 +1556,7 @@ export default function HomePage() {
         </a>
 
         {/* WATCHLIST */}
-        <a href="/profile" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+       <a href="/watchlist" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
           <span style={{ fontSize: '18px' }}>📌</span>
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Watchlist</span>
         </a>
