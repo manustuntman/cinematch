@@ -40,6 +40,15 @@ const AVERSIONS_LIST = [
   { id: 2439, keyword: '2439,183205', name: '🐍 Serpents' },
 ];
 
+// Nouveaux moods rapides pour filtrer les tendances au sommet
+const MOODS_LIST = [
+  { id: 'all', label: '🔥 Tous' },
+  { id: 'action', label: '💥 Action non-stop', genreId: 28 },
+  { id: 'scifi', label: '🚀 Sci-Fi & Espace', genreId: 878 },
+  { id: 'feelgood', label: '🥰 Feel-Good', genreId: 35 },
+  { id: 'thriller', label: '🔪 Sैन/Thriller', genreId: 53 },
+];
+
 const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩‍👦', 'Coup de cœur ❤️', 'À revoir 🔄'];
 
 function SkeletonCard() {
@@ -54,11 +63,15 @@ function SkeletonCard() {
   );
 }
 
-function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void; currentUserId: string }) {
+function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void; currentUserId: string; userWatchlist: any[] }) {
   const [cast, setCast] = useState<any[]>([]);
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const title = item.title || item.name;
+
+  // Vérifie si le film est dans la watchlist perso de l'utilisateur
+  const watchlistEntry = userWatchlist.find(w => w.movie_id === item.id.toString());
+  const statusBadge = watchlistEntry ? watchlistEntry.status : null; // 'watched' ou 'to_watch'
 
   useEffect(() => {
     let isMounted = true;
@@ -141,6 +154,18 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; 
             ★ {item.vote_average?.toFixed(1)}
           </span>
 
+          {/* BADGE WATCHLIST / DÉJÀ VU DIRECTEMENT SUR L'AFFICHE */}
+          {statusBadge === 'watched' && (
+            <span style={{ position: 'absolute', bottom: '8px', left: '8px', zIndex: 5, backgroundColor: 'rgba(16, 185, 129, 0.9)', color: '#FFF', fontSize: '9px', fontWeight: '800', padding: '3px 6px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>
+              👁️ Déjà vu
+            </span>
+          )}
+          {statusBadge === 'to_watch' && (
+            <span style={{ position: 'absolute', bottom: '8px', left: '8px', zIndex: 5, backgroundColor: 'rgba(147, 51, 234, 0.9)', color: '#FFF', fontSize: '9px', fontWeight: '800', padding: '3px 6px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>
+              📌 Watchlist
+            </span>
+          )}
+
           <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}>
             <button 
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowDropdown(!showDropdown); }}
@@ -202,6 +227,7 @@ export default function HomePage() {
   const [user, setUser] = useState<any>(null);
   const [userLevel, setUserLevel] = useState<number>(1);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [userWatchlist, setUserWatchlist] = useState<any[]>([]);
 
   const [viewMode, setViewMode] = useState<'standard' | 'kids' | 'couple'>('standard');
   const [isLoadingRecs, setIsLoadingRecs] = useState(false);
@@ -218,6 +244,7 @@ export default function HomePage() {
   const [trendingMedia, setTrendingMedia] = useState<any[]>([]);
   const [trendingPage, setTrendingPage] = useState<number>(1);
   const [isLoadingMoreTrending, setIsLoadingMoreTrending] = useState(false);
+  const [activeMood, setActiveMood] = useState<string>('all');
 
   const [recommendedMedia, setRecommendedMedia] = useState<any[]>([]);
   const [carouselMedia, setCarouselMedia] = useState<any[]>([]);
@@ -274,11 +301,15 @@ export default function HomePage() {
         const { data: profileData } = await supabase.from('profiles').select('xp').eq('id', uid).single();
         const xp = (profileData?.xp && profileData.xp > 0) ? profileData.xp : (likesCount * 50);
         setUserLevel(Math.floor(xp / 500) + 1);
+
+        // Charger la watchlist perso pour afficher les badges instantanément
+        const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_id', uid);
+        if (watchData) setUserWatchlist(watchData);
       }
     };
 
     initUserAndData();
-    fetchTrending(1, true);
+    fetchTrending(1, true, 'all');
     fetchRandomCarousel();
   }, [mediaType]);
 
@@ -297,12 +328,23 @@ export default function HomePage() {
     }
   };
 
-  const fetchTrending = async (pageToFetch = 1, reset = false) => {
+  const fetchTrending = async (pageToFetch = 1, reset = false, mood = activeMood) => {
     if (isLoadingMoreTrending) return;
     if (!reset) setIsLoadingMoreTrending(true);
 
     try {
-      const url = `/api/tmdb?endpoint=/trending/${mediaType}/week&language=fr-FR&page=${pageToFetch}`;
+      let endpoint = `/trending/${mediaType}/week`;
+      let extraParams = '';
+
+      if (mood !== 'all') {
+        const selectedMoodObj = MOODS_LIST.find(m => m.id === mood);
+        if (selectedMoodObj && selectedMoodObj.genreId) {
+          endpoint = `/discover/${mediaType}`;
+          extraParams = `&with_genres=${selectedMoodObj.genreId}&sort_by=popularity.desc`;
+        }
+      }
+
+      const url = `/api/tmdb?endpoint=${endpoint}&language=fr-FR&page=${pageToFetch}${extraParams}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
@@ -319,6 +361,11 @@ export default function HomePage() {
     setIsLoadingMoreTrending(false);
   };
 
+  const handleMoodChange = (moodId: string) => {
+    setActiveMood(moodId);
+    fetchTrending(1, true, moodId);
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       if (isSetupComplete) return;
@@ -328,13 +375,13 @@ export default function HomePage() {
       if (scrollPosition >= threshold && !isLoadingMoreTrending) {
         const nextPage = trendingPage + 1;
         setTrendingPage(nextPage);
-        fetchTrending(nextPage, false);
+        fetchTrending(nextPage, false, activeMood);
       }
     };
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [trendingPage, isLoadingMoreTrending, isSetupComplete]);
+  }, [trendingPage, isLoadingMoreTrending, isSetupComplete, activeMood]);
 
   const fetchUserPlaylists = async () => {
     if (!currentUserId) return;
@@ -601,28 +648,30 @@ export default function HomePage() {
       if (checkError) throw checkError;
 
       if (existing && existing.length > 0) {
-        setFeedback('⚠️ Ce média est déjà dans votre liste !');
-        setTimeout(() => setFeedback(null), 3000);
-        setSelectedMediaDetail(null);
-        return;
+        // Mettre à jour le statut existant
+        await supabase.from('watchlist').update({ status }).eq('movie_id', movieIdStr).eq('user_id', currentUserId);
+      } else {
+        const { error } = await supabase.from('watchlist').insert([
+          {
+            user_id: currentUserId,
+            movie_id: movieIdStr,
+            title: title,
+            poster_path: selectedMediaDetail.poster_path ? `https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}` : selectedMediaDetail.poster,
+            vote_average: parseFloat(selectedMediaDetail.vote_average || 0),
+            status: status,
+            user_notes: userNotes,
+            user_rating: userRating,
+            user_tags: selectedTags,
+            media_type: mediaType
+          },
+        ]);
+        if (error) throw error;
       }
 
-      const { error } = await supabase.from('watchlist').insert([
-        {
-          user_id: currentUserId,
-          movie_id: movieIdStr,
-          title: title,
-          poster_path: selectedMediaDetail.poster_path ? `https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}` : selectedMediaDetail.poster,
-          vote_average: parseFloat(selectedMediaDetail.vote_average || 0),
-          status: status,
-          user_notes: userNotes,
-          user_rating: userRating,
-          user_tags: selectedTags,
-          media_type: mediaType
-        },
-      ]);
+      // Mettre à jour l'état local de la watchlist pour rafraîchir les badges instantanément
+      const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_id', currentUserId);
+      if (watchData) setUserWatchlist(watchData);
 
-      if (error) throw error;
       setFeedback(status === 'to_watch' ? '📌 Ajouté à la Watchlist !' : '👁️ Marqué comme vu !');
       setSelectedMediaDetail(null);
     } catch (err) {
@@ -1066,7 +1115,7 @@ export default function HomePage() {
             <div style={{ 
               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(236, 72, 153, 0.15))', 
               border: '1px solid rgba(192, 132, 252, 0.4)', 
-              borderRadius: '24px', padding: '20px', textAlign: 'center', marginBottom: '32px',
+              borderRadius: '24px', padding: '20px', textAlign: 'center', marginBottom: '24px',
               boxShadow: '0 10px 30px -5px rgba(147, 51, 234, 0.3)'
             }}>
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '2px', color: '#FBBF24', textTransform: 'uppercase' }}>
@@ -1105,20 +1154,50 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* TENDANCES AVEC DÉFILEMENT INFINI */}
+            {/* SECTION TENDANCES & FILTRES RAPIDES PAR MOOD */}
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
-                🔥 Tendances
-              </h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>
+                  🔥 Tendances & Moods
+                </h2>
+              </div>
+
+              {/* FILTRES RAPIDES PAR MOOD (SCROLLABLE HORIZONTALEMENT) */}
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '16px', scrollbarWidth: 'none' }}>
+                {MOODS_LIST.map((mood) => {
+                  const isActive = activeMood === mood.id;
+                  return (
+                    <button
+                      key={mood.id}
+                      onClick={() => handleMoodChange(mood.id)}
+                      style={{
+                        backgroundColor: isActive ? '#9333EA' : 'rgba(255, 255, 255, 0.06)',
+                        border: isActive ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
+                        color: '#FFF',
+                        padding: '8px 14px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        boxShadow: isActive ? '0 4px 12px rgba(147, 51, 234, 0.4)' : 'none'
+                      }}
+                    >
+                      {mood.label}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {trendingMedia.map((item, idx) => (
-                  <MediaCardXRay key={`${item.id}-${idx}`} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} />
+                  <MediaCardXRay key={`${item.id}-${idx}`} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} />
                 ))}
               </div>
 
               {isLoadingMoreTrending && (
                 <div style={{ textAlign: 'center', padding: '20px 0', color: '#C084FC', fontSize: '12px', fontWeight: 'bold' }}>
-                  ⚡ Chargement de plus de tendances...
+                  ⚡ Chargement de plus de films...
                 </div>
               )}
             </div>
@@ -1147,7 +1226,7 @@ export default function HomePage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {recommendedMedia.map((item) => (
-                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} />
+                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} />
                 ))}
               </div>
             )}
