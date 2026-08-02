@@ -46,7 +46,7 @@ const MOODS_LIST = [
   { id: 'action', label: '💥 Action non-stop', genreId: 28 },
   { id: 'scifi', label: '🚀 Sci-Fi & Espace', genreId: 878 },
   { id: 'feelgood', label: '🥰 Feel-Good', genreId: 35 },
-  { id: 'thriller', label: '🔪 Sैन/Thriller', genreId: 53 },
+  { id: 'thriller', label: '🔪 Thriller', genreId: 53 },
 ];
 
 const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩‍👦', 'Coup de cœur ❤️', 'À revoir 🔄'];
