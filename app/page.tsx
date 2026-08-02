@@ -224,6 +224,7 @@ export default function HomePage() {
   const [user, setUser] = useState<any>(null);
   const [userLevel, setUserLevel] = useState<number>(1);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [userWatchlist, setUserWatchlist] = useState<any[]>([]);
 
   const [viewMode, setViewMode] = useState<'standard' | 'kids' | 'couple'>('standard');
@@ -295,9 +296,13 @@ export default function HomePage() {
         const { data: likes } = await supabase.from('user_swipes').select('id').eq('user_uid', uid).eq('action', 'liked');
         const likesCount = likes ? likes.length : 0;
         
-        const { data: profileData } = await supabase.from('profiles').select('xp').eq('id', uid).single();
+        const { data: profileData } = await supabase.from('profiles').select('xp, avatar_url').eq('id', uid).single();
         const xp = (profileData?.xp && profileData.xp > 0) ? profileData.xp : (likesCount * 50);
         setUserLevel(Math.floor(xp / 500) + 1);
+
+        if (profileData?.avatar_url) {
+          setUserAvatarUrl(profileData.avatar_url);
+        }
 
         const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_id', uid);
         if (watchData) setUserWatchlist(watchData);
@@ -757,7 +762,13 @@ export default function HomePage() {
               textDecoration: 'none'
             }}
           >
-            <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold' }}>👤</div>
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', overflow: 'hidden', backgroundColor: '#9333EA', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              {userAvatarUrl ? (
+                <Image src={userAvatarUrl} alt="Avatar" fill sizes="30px" style={{ objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: '14px', fontWeight: 'bold' }}>👤</span>
+              )}
+            </div>
             <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>Niv. {userLevel} ✨</span>
           </a>
         </header>
@@ -1481,7 +1492,7 @@ export default function HomePage() {
 
       </div>
 
-      {/* BARRE DE NAVIGATION FLOTTANTE AVEC PROFIL AU CENTRE EN SURÉLEVÉ */}
+      {/* BARRE DE NAVIGATION FLOTTANTE AVEC AVATAR PROFIL AU CENTRE EN SURÉLEVÉ & WATCHLIST SUR LE CÔTÉ */}
       <nav style={{ 
         position: 'fixed', 
         bottom: '20px', 
@@ -1512,7 +1523,7 @@ export default function HomePage() {
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Party</span>
         </a>
 
-        {/* PROFIL AU CENTRE (PLUS GROS & SURÉLEVÉ) */}
+        {/* PROFIL AU CENTRE AVEC LA PHOTO (PLUS GROS & SURÉLEVÉ) */}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', position: 'relative' }}>
           <a href="/profile" style={{ 
             position: 'absolute', 
@@ -1523,13 +1534,17 @@ export default function HomePage() {
             backgroundColor: '#9333EA', 
             border: '3px solid #18181B', 
             display: 'flex', 
-            flexDirection: 'column',
             alignItems: 'center', 
             justifyContent: 'center', 
+            overflow: 'hidden',
             textDecoration: 'none',
             boxShadow: '0 6px 20px rgba(147, 51, 234, 0.6)'
           }}>
-            <span style={{ fontSize: '20px' }}>👤</span>
+            {userAvatarUrl ? (
+              <Image src={userAvatarUrl} alt="Avatar" fill sizes="50px" style={{ objectFit: 'cover' }} />
+            ) : (
+              <span style={{ fontSize: '20px' }}>👤</span>
+            )}
           </a>
           <span style={{ fontSize: '9px', color: '#A1A1AA', marginTop: '24px', fontWeight: 'bold' }}>Profil</span>
         </div>
@@ -1540,7 +1555,7 @@ export default function HomePage() {
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Playlists</span>
         </a>
 
-        {/* WATCHLIST (REMPLACE L'ANCIEN PROFIL) */}
+        {/* WATCHLIST */}
         <a href="/profile" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
           <span style={{ fontSize: '18px' }}>📌</span>
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Watchlist</span>
