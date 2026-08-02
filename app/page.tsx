@@ -40,7 +40,6 @@ const AVERSIONS_LIST = [
   { id: 2439, keyword: '2439,183205', name: '🐍 Serpents' },
 ];
 
-// Nouveaux moods rapides pour filtrer les tendances au sommet
 const MOODS_LIST = [
   { id: 'all', label: '🔥 Tous' },
   { id: 'action', label: '💥 Action non-stop', genreId: 28 },
@@ -69,9 +68,8 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist }
   const [showDropdown, setShowDropdown] = useState(false);
   const title = item.title || item.name;
 
-  // Vérifie si le film est dans la watchlist perso de l'utilisateur
   const watchlistEntry = userWatchlist.find(w => w.movie_id === item.id.toString());
-  const statusBadge = watchlistEntry ? watchlistEntry.status : null; // 'watched' ou 'to_watch'
+  const statusBadge = watchlistEntry ? watchlistEntry.status : null;
 
   useEffect(() => {
     let isMounted = true;
@@ -154,7 +152,6 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist }
             ★ {item.vote_average?.toFixed(1)}
           </span>
 
-          {/* BADGE WATCHLIST / DÉJÀ VU DIRECTEMENT SUR L'AFFICHE */}
           {statusBadge === 'watched' && (
             <span style={{ position: 'absolute', bottom: '8px', left: '8px', zIndex: 5, backgroundColor: 'rgba(16, 185, 129, 0.9)', color: '#FFF', fontSize: '9px', fontWeight: '800', padding: '3px 6px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>
               👁️ Déjà vu
@@ -302,7 +299,6 @@ export default function HomePage() {
         const xp = (profileData?.xp && profileData.xp > 0) ? profileData.xp : (likesCount * 50);
         setUserLevel(Math.floor(xp / 500) + 1);
 
-        // Charger la watchlist perso pour afficher les badges instantanément
         const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_id', uid);
         if (watchData) setUserWatchlist(watchData);
       }
@@ -648,7 +644,6 @@ export default function HomePage() {
       if (checkError) throw checkError;
 
       if (existing && existing.length > 0) {
-        // Mettre à jour le statut existant
         await supabase.from('watchlist').update({ status }).eq('movie_id', movieIdStr).eq('user_id', currentUserId);
       } else {
         const { error } = await supabase.from('watchlist').insert([
@@ -668,7 +663,6 @@ export default function HomePage() {
         if (error) throw error;
       }
 
-      // Mettre à jour l'état local de la watchlist pour rafraîchir les badges instantanément
       const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_id', currentUserId);
       if (watchData) setUserWatchlist(watchData);
 
@@ -1162,7 +1156,7 @@ export default function HomePage() {
                 </h2>
               </div>
 
-              {/* FILTRES RAPIDES PAR MOOD (SCROLLABLE HORIZONTALEMENT) */}
+              {/* FILTRES RAPIDES PAR MOOD */}
               <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '16px', scrollbarWidth: 'none' }}>
                 {MOODS_LIST.map((mood) => {
                   const isActive = activeMood === mood.id;
@@ -1487,39 +1481,69 @@ export default function HomePage() {
 
       </div>
 
-      {/* BARRE DE NAVIGATION FLOTTANTE (FLOATING DOCK) */}
+      {/* BARRE DE NAVIGATION FLOTTANTE AVEC PROFIL AU CENTRE EN SURÉLEVÉ */}
       <nav style={{ 
         position: 'fixed', 
         bottom: '20px', 
         left: '50%', 
         transform: 'translateX(-50%)', 
         width: '90%', 
-        maxWidth: '400px', 
-        backgroundColor: 'rgba(24, 24, 27, 0.85)', 
+        maxWidth: '420px', 
+        backgroundColor: 'rgba(24, 24, 27, 0.9)', 
         border: '1px solid rgba(255, 255, 255, 0.15)', 
         display: 'flex', 
         justifyContent: 'space-around', 
-        padding: '10px 0', 
+        alignItems: 'center',
+        padding: '8px 0', 
         borderRadius: '35px', 
         zIndex: 1000, 
         backdropFilter: 'blur(16px)',
         boxShadow: '0 15px 35px rgba(0, 0, 0, 0.8)'
       }}>
-        <a href="/" style={{ color: '#9333EA', textDecoration: 'none', textAlign: 'center', fontSize: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span>🏠</span>
+        {/* ACCUEIL */}
+        <a href="/" style={{ color: '#9333EA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+          <span style={{ fontSize: '18px' }}>🏠</span>
           <span style={{ fontSize: '9px', marginTop: '2px', fontWeight: 'bold' }}>Accueil</span>
         </a>
-        <a href="/potecorn-party" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span>🔥</span>
+
+        {/* PARTY */}
+        <a href="/potecorn-party" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+          <span style={{ fontSize: '18px' }}>🔥</span>
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Party</span>
         </a>
-        <a href="/playlists" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span>🎵</span>
+
+        {/* PROFIL AU CENTRE (PLUS GROS & SURÉLEVÉ) */}
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', position: 'relative' }}>
+          <a href="/profile" style={{ 
+            position: 'absolute', 
+            top: '-22px', 
+            width: '50px', 
+            height: '50px', 
+            borderRadius: '50%', 
+            backgroundColor: '#9333EA', 
+            border: '3px solid #18181B', 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            textDecoration: 'none',
+            boxShadow: '0 6px 20px rgba(147, 51, 234, 0.6)'
+          }}>
+            <span style={{ fontSize: '20px' }}>👤</span>
+          </a>
+          <span style={{ fontSize: '9px', color: '#A1A1AA', marginTop: '24px', fontWeight: 'bold' }}>Profil</span>
+        </div>
+
+        {/* PLAYLISTS */}
+        <a href="/playlists" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+          <span style={{ fontSize: '18px' }}>🎵</span>
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Playlists</span>
         </a>
-        <a href="/profile" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span>👤</span>
-          <span style={{ fontSize: '9px', marginTop: '2px' }}>Profil</span>
+
+        {/* WATCHLIST (REMPLACE L'ANCIEN PROFIL) */}
+        <a href="/profile" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+          <span style={{ fontSize: '18px' }}>📌</span>
+          <span style={{ fontSize: '9px', marginTop: '2px' }}>Watchlist</span>
         </a>
       </nav>
 
