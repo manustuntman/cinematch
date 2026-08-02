@@ -81,7 +81,8 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist }
           setCast(data.cast.slice(0, 2));
         }
 
-        if (currentUserId) {
+        // Sécurité supplémentaire : on ne charge que si on a bien l'ID utilisateur
+        if (currentUserId && currentUserId !== '') {
           const { data: plData } = await supabase.from('playlists').select('*').eq('user_uid', currentUserId);
           if (isMounted && plData) setPlaylists(plData);
         }
@@ -283,7 +284,7 @@ export default function HomePage() {
       const { data: { session } } = await supabase.auth.getSession();
       let uid = '';
 
-      if (session) {
+      if (session && session.user) {
         setUser(session.user);
         uid = session.user.id;
       } else {
@@ -292,7 +293,7 @@ export default function HomePage() {
       
       setCurrentUserId(uid);
 
-      if (uid) {
+      if (uid && uid !== '') {
         const { data: likes } = await supabase.from('user_swipes').select('id').eq('user_uid', uid).eq('action', 'liked');
         const likesCount = likes ? likes.length : 0;
         
@@ -385,7 +386,8 @@ export default function HomePage() {
   }, [trendingPage, isLoadingMoreTrending, isSetupComplete, activeMood]);
 
   const fetchUserPlaylists = async () => {
-    if (!currentUserId) return;
+    // Si currentUserId est vide, on arrête net pour ne rien charger du tout !
+    if (!currentUserId || currentUserId === '') return;
     try {
       const { data } = await supabase.from('playlists').select('*').eq('user_uid', currentUserId);
       if (data) setUserPlaylists(data);
@@ -629,7 +631,7 @@ export default function HomePage() {
 
   const saveToSupabaseWithNotebook = async (status: 'to_watch' | 'watched') => {
     if (!selectedMediaDetail) return;
-    if (!currentUserId) {
+    if (!currentUserId || currentUserId === '') {
       setFeedback('⚠️ Connectez-vous ou créez un profil pour sauvegarder !');
       setTimeout(() => setFeedback(null), 3000);
       return;
@@ -1492,7 +1494,7 @@ export default function HomePage() {
 
       </div>
 
-      {/* BARRE DE NAVIGATION FLOTTANTE AVEC AVATAR PROFIL AU CENTRE EN SURÉLEVÉ & WATCHLIST SUR LE CÔTÉ */}
+      {/* BARRE DE NAVIGATION FLOTTANTE */}
       <nav style={{ 
         position: 'fixed', 
         bottom: '20px', 
@@ -1523,7 +1525,7 @@ export default function HomePage() {
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Party</span>
         </a>
 
-        {/* PROFIL AU CENTRE AVEC LA PHOTO (PLUS GROS & SURÉLEVÉ) */}
+        {/* PROFIL AU CENTRE AVEC LA PHOTO */}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', position: 'relative' }}>
           <a href="/profile" style={{ 
             position: 'absolute', 
@@ -1556,7 +1558,7 @@ export default function HomePage() {
         </a>
 
         {/* WATCHLIST */}
-       <a href="/watchlist" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+        <a href="/watchlist" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
           <span style={{ fontSize: '18px' }}>📌</span>
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Watchlist</span>
         </a>
