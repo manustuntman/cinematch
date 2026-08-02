@@ -279,9 +279,26 @@ export default function HomePage() {
 
     initUserAndData();
     fetchTrending(1, true);
+    fetchRandomCarousel();
   }, [mediaType]);
 
-  // Fonction pour charger les tendances avec gestion de pagination (Scroll Infini)
+  // Carrousel aléatoire (tire des pages et des films au hasard)
+  const fetchRandomCarousel = async () => {
+    try {
+      const randomPage = Math.floor(Math.random() * 20) + 1;
+      const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&sort_by=popularity.desc&page=${randomPage}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.results) {
+        // On mélange un peu le tableau pour plus de hasard
+        const shuffled = data.results.sort(() => 0.5 - Math.random());
+        setCarouselMedia(shuffled.slice(0, 12));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchTrending = async (pageToFetch = 1, reset = false) => {
     if (isLoadingMoreTrending) return;
     if (!reset) setIsLoadingMoreTrending(true);
@@ -293,7 +310,6 @@ export default function HomePage() {
       if (data.results) {
         if (reset) {
           setTrendingMedia(data.results);
-          setCarouselMedia(data.results.slice(0, 12));
           setTrendingPage(1);
         } else {
           setTrendingMedia(prev => [...prev, ...data.results]);
@@ -305,10 +321,9 @@ export default function HomePage() {
     setIsLoadingMoreTrending(false);
   };
 
-  // Écouteur de scroll pour déclencher le chargement infini des tendances
   useEffect(() => {
     const handleScroll = () => {
-      if (isSetupComplete) return; // Actif uniquement sur l'accueil (tendances)
+      if (isSetupComplete) return;
       const scrollPosition = window.innerHeight + window.scrollY;
       const threshold = document.documentElement.scrollHeight - 300;
 
@@ -774,7 +789,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* CAROUSEL FLUIDE EN MOUVEMENT */}
+        {/* CAROUSEL FLUIDE ALÉATOIRE */}
         {!isSetupComplete && carouselMedia.length > 0 && (
           <div style={{ marginBottom: '20px', overflow: 'hidden', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(24, 24, 27, 0.4)', padding: '10px 0', position: 'relative' }}>
             <div className="animate-marquee" style={{ display: 'flex', gap: '12px' }}>
@@ -904,7 +919,7 @@ export default function HomePage() {
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                 <button
-                  onClick={() => { setMediaType('movie'); setPreferences([]); setViewMode('standard'); }}
+                  onClick={() => { setMediaType('movie'); setPreferences([]); setViewMode('standard'); fetchRandomCarousel(); }}
                   style={{
                     backgroundColor: mediaType === 'movie' && viewMode === 'standard' ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
                     border: mediaType === 'movie' && viewMode === 'standard' ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
@@ -914,7 +929,7 @@ export default function HomePage() {
                   🎬 Un Film
                 </button>
                 <button
-                  onClick={() => { setMediaType('tv'); setPreferences([]); setViewMode('standard'); }}
+                  onClick={() => { setMediaType('tv'); setPreferences([]); setViewMode('standard'); fetchRandomCarousel(); }}
                   style={{
                     backgroundColor: mediaType === 'tv' && viewMode === 'standard' ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
                     border: mediaType === 'tv' && viewMode === 'standard' ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
