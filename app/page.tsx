@@ -216,6 +216,9 @@ export default function HomePage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
   const [trendingMedia, setTrendingMedia] = useState<any[]>([]);
+  const [trendingPage, setTrendingPage] = useState<number>(1);
+  const [isLoadingMoreTrending, setIsLoadingMoreTrending] = useState(false);
+
   const [recommendedMedia, setRecommendedMedia] = useState<any[]>([]);
   const [carouselMedia, setCarouselMedia] = useState<any[]>([]);
   const [rouletteMedia, setRouletteMedia] = useState<any>(null);
@@ -275,8 +278,50 @@ export default function HomePage() {
     };
 
     initUserAndData();
-    fetchTrending();
+    fetchTrending(1, true);
   }, [mediaType]);
+
+  // Fonction pour charger les tendances avec gestion de pagination (Scroll Infini)
+  const fetchTrending = async (pageToFetch = 1, reset = false) => {
+    if (isLoadingMoreTrending) return;
+    if (!reset) setIsLoadingMoreTrending(true);
+
+    try {
+      const url = `/api/tmdb?endpoint=/trending/${mediaType}/week&language=fr-FR&page=${pageToFetch}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.results) {
+        if (reset) {
+          setTrendingMedia(data.results);
+          setCarouselMedia(data.results.slice(0, 12));
+          setTrendingPage(1);
+        } else {
+          setTrendingMedia(prev => [...prev, ...data.results]);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setIsLoadingMoreTrending(false);
+  };
+
+  // Écouteur de scroll pour déclencher le chargement infini des tendances
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isSetupComplete) return; // Actif uniquement sur l'accueil (tendances)
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.scrollHeight - 300;
+
+      if (scrollPosition >= threshold && !isLoadingMoreTrending) {
+        const nextPage = trendingPage + 1;
+        setTrendingPage(nextPage);
+        fetchTrending(nextPage, false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [trendingPage, isLoadingMoreTrending, isSetupComplete]);
 
   const fetchUserPlaylists = async () => {
     if (!currentUserId) return;
@@ -304,20 +349,6 @@ export default function HomePage() {
       const data = await res.json();
       if (data.results) {
         setSearchResults(data.results.slice(0, 10));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchTrending = async () => {
-    try {
-      const url = `/api/tmdb?endpoint=/trending/${mediaType}/week&language=fr-FR`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.results) {
-        setTrendingMedia(data.results.slice(0, 20));
-        setCarouselMedia(data.results.slice(0, 12));
       }
     } catch (err) {
       console.error(err);
@@ -1061,16 +1092,22 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* TENDANCES */}
+            {/* TENDANCES AVEC DÉFILEMENT INFINI */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
                 🔥 Tendances
               </h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
-                {trendingMedia.map((item) => (
-                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} />
+                {trendingMedia.map((item, idx) => (
+                  <MediaCardXRay key={`${item.id}-${idx}`} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} />
                 ))}
               </div>
+
+              {isLoadingMoreTrending && (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#C084FC', fontSize: '12px', fontWeight: 'bold' }}>
+                  ⚡ Chargement de plus de tendances...
+                </div>
+              )}
             </div>
           </div>
         ) : (
