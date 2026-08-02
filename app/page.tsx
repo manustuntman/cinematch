@@ -81,7 +81,6 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist }
           setCast(data.cast.slice(0, 2));
         }
 
-        // Sécurité supplémentaire : on ne charge que si on a bien l'ID utilisateur
         if (currentUserId && currentUserId !== '') {
           const { data: plData } = await supabase.from('playlists').select('*').eq('user_uid', currentUserId);
           if (isMounted && plData) setPlaylists(plData);
@@ -386,7 +385,6 @@ export default function HomePage() {
   }, [trendingPage, isLoadingMoreTrending, isSetupComplete, activeMood]);
 
   const fetchUserPlaylists = async () => {
-    // Si currentUserId est vide, on arrête net pour ne rien charger du tout !
     if (!currentUserId || currentUserId === '') return;
     try {
       const { data } = await supabase.from('playlists').select('*').eq('user_uid', currentUserId);
