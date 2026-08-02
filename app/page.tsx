@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 
 const GENRES_LIST_MOVIES = [
@@ -63,7 +64,6 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; 
     let isMounted = true;
     const fetchCastAndPlaylists = async () => {
       try {
-        // APPEL SÉCURISÉ VIA NOTRE ROUTE API INTERNE
         const res = await fetch(`/api/tmdb?endpoint=/${mediaType}/${item.id}/credits&language=fr-FR`);
         const data = await res.json();
         if (isMounted && data.cast) {
@@ -107,6 +107,8 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; 
     }
   };
 
+  const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450';
+
   return (
     <div 
       onClick={() => onOpen(item)}
@@ -127,14 +129,15 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; 
       onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
     >
       <div>
-        <div style={{ position: 'relative' }}>
-          <img 
-            src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450'} 
+        <div style={{ position: 'relative', width: '100%', height: '200px' }}>
+          <Image 
+            src={posterUrl} 
             alt={title} 
-            loading="lazy"
-            style={{ width: '100%', height: '200px', objectFit: 'cover' }} 
+            fill
+            sizes="(max-width: 768px) 50vw, 200px"
+            style={{ objectFit: 'cover' }} 
           />
-          <span style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: 'rgba(0,0,0,0.75)', color: '#FBBF24', fontSize: '10px', fontWeight: '800', padding: '3px 8px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
+          <span style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 5, backgroundColor: 'rgba(0,0,0,0.75)', color: '#FBBF24', fontSize: '10px', fontWeight: '800', padding: '3px 8px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
             ★ {item.vote_average?.toFixed(1)}
           </span>
 
@@ -296,7 +299,6 @@ export default function HomePage() {
       return;
     }
     try {
-      // APPEL SÉCURISÉ
       const url = `/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&query=${encodeURIComponent(query)}&page=1`;
       const res = await fetch(url);
       const data = await res.json();
@@ -310,7 +312,6 @@ export default function HomePage() {
 
   const fetchTrending = async () => {
     try {
-      // APPEL SÉCURISÉ
       const url = `/api/tmdb?endpoint=/trending/${mediaType}/week&language=fr-FR`;
       const res = await fetch(url);
       const data = await res.json();
@@ -343,7 +344,6 @@ export default function HomePage() {
       const excludedStr = excludeParam ? `&without_genres=${excludeParam}&without_keywords=${excludeParam}` : '';
       const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
       
-      // APPEL SÉCURISÉ
       const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc${excludedStr}${providersQuery}${certificationParam}&page=1`;
       
       const res = await fetch(url);
@@ -384,13 +384,11 @@ export default function HomePage() {
       const fetchedResults: any[] = [];
 
       for (const rec of aiData.recommendations) {
-        // APPEL SÉCURISÉ
         let tmdbRes = await fetch(`/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&query=${encodeURIComponent(rec.title)}&page=1`);
         let tmdbData = await tmdbRes.json();
 
         if (!tmdbData.results || tmdbData.results.length === 0) {
           const simplifiedTitle = rec.title.split(':')[0].split('-')[0].trim();
-          // APPEL SÉCURISÉ FALLBACK
           tmdbRes = await fetch(`/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&query=${encodeURIComponent(simplifiedTitle)}&page=1`);
           tmdbData = await tmdbRes.json();
         }
@@ -436,7 +434,6 @@ export default function HomePage() {
       const excludedStr = excludeParam ? `&without_keywords=${excludeParam}&without_genres=${excludeParam}` : '';
       const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
       
-      // APPEL SÉCURISÉ
       const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&sort_by=popularity.desc${genreQuery}${excludedStr}${providersQuery}${certificationParam}&page=${Math.floor(Math.random() * 5) + 1}`;
       
       const res = await fetch(url);
@@ -458,7 +455,6 @@ export default function HomePage() {
   const fetchExtraDetails = async (id: string | number) => {
     setLoadingExt(true);
     try {
-      // APPELS SÉCURISÉS COMBINÉS
       const detailRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}&language=fr-FR`);
       const detailData = await detailRes.json();
 
@@ -707,7 +703,9 @@ export default function HomePage() {
                   onClick={() => { openMediaModal(item); setSearchResults([]); setSearchQuery(''); }}
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', cursor: 'pointer' }}
                 >
-                  <img src={item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : 'https://via.placeholder.com/40'} alt="" loading="lazy" style={{ width: '36px', height: '50px', objectFit: 'cover', borderRadius: '6px' }} />
+                  <div style={{ position: 'relative', width: '36px', height: '50px', flexShrink: 0 }}>
+                    <Image src={item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : 'https://via.placeholder.com/40'} alt="" fill sizes="36px" style={{ objectFit: 'cover', borderRadius: '6px' }} />
+                  </div>
                   <div>
                     <h4 style={{ fontSize: '13px', margin: '0 0 2px 0', color: '#FFF' }}>{item.title || item.name}</h4>
                     <span style={{ fontSize: '10px', color: '#A1A1AA' }}>★ {item.vote_average?.toFixed(1)}</span>
@@ -755,13 +753,14 @@ export default function HomePage() {
                   onClick={() => openMediaModal(item)}
                   style={{ width: '80px', height: '115px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, cursor: 'pointer', position: 'relative', border: '1px solid rgba(255,255,255,0.15)' }}
                 >
-                  <img 
+                  <Image 
                     src={item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : 'https://via.placeholder.com/80x115'} 
                     alt="" 
-                    loading="lazy"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    fill
+                    sizes="80px"
+                    style={{ objectFit: 'cover' }} 
                   />
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.75)', padding: '2px 4px', fontSize: '8px', color: '#FBBF24', textAlign: 'center', fontWeight: '700' }}>
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5, background: 'rgba(0,0,0,0.75)', padding: '2px 4px', fontSize: '8px', color: '#FBBF24', textAlign: 'center', fontWeight: '700' }}>
                     ★ {item.vote_average?.toFixed(1)}
                   </div>
                 </div>
@@ -847,7 +846,9 @@ export default function HomePage() {
                       cursor: 'pointer'
                     }}
                   >
-                    <img src={item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : 'https://via.placeholder.com/130x180'} alt="" loading="lazy" style={{ width: '100%', height: '130px', objectFit: 'cover' }} />
+                    <div style={{ position: 'relative', width: '100%', height: '130px' }}>
+                      <Image src={item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : 'https://via.placeholder.com/130x180'} alt="" fill sizes="110px" style={{ objectFit: 'cover' }} />
+                    </div>
                     <div style={{ padding: '8px' }}>
                       <h4 style={{ fontSize: '11px', fontWeight: '800', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>{item.title || item.name}</h4>
                       <span style={{ fontSize: '9px', color: '#C084FC', fontWeight: '700', display: 'block' }}>★ {item.vote_average?.toFixed(1)} / 10</span>
@@ -1044,7 +1045,9 @@ export default function HomePage() {
 
               {rouletteMedia && !isSpinning && (
                 <div style={{ marginTop: '16px', backgroundColor: 'rgba(24, 24, 27, 0.95)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left' }}>
-                  <img src={`https://image.tmdb.org/t/p/w500${rouletteMedia.poster_path}`} alt="" loading="lazy" style={{ width: '65px', height: '95px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+                  <div style={{ position: 'relative', width: '65px', height: '95px', flexShrink: 0 }}>
+                    <Image src={`https://image.tmdb.org/t/p/w500${rouletteMedia.poster_path}`} alt="" fill sizes="65px" style={{ objectFit: 'cover', borderRadius: '8px' }} />
+                  </div>
                   
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: '9px', color: '#FBBF24', fontWeight: '700', textTransform: 'uppercase' }}>🎯 Résultat roulette :</span>
@@ -1132,7 +1135,9 @@ export default function HomePage() {
               {activeTab === 'info' && (
                 <div>
                   <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                    <img src={`https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}`} alt="" loading="lazy" style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
+                    <div style={{ position: 'relative', width: '100px', height: '140px', flexShrink: 0 }}>
+                      <Image src={`https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}`} alt="" fill sizes="100px" style={{ objectFit: 'cover', borderRadius: '12px' }} />
+                    </div>
                     <div style={{ flex: 1 }}>
                       <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 4px 0' }}>{selectedMediaDetail.title || selectedMediaDetail.name}</h2>
                       <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '8px', display: 'inline-block', marginBottom: '8px' }}>
@@ -1167,7 +1172,9 @@ export default function HomePage() {
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                               {mediaDetailsExt.freeProviders.map((provider: any) => (
                                 <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.2)', padding: '4px 8px', borderRadius: '8px' }}>
-                                  <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt="" style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+                                  <div style={{ position: 'relative', width: '20px', height: '20px' }}>
+                                    <Image src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt="" fill sizes="20px" style={{ objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
                                   <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
                                 </div>
                               ))}
@@ -1181,7 +1188,9 @@ export default function HomePage() {
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                               {mediaDetailsExt.providers.map((provider: any) => (
                                 <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px 8px', borderRadius: '8px' }}>
-                                  <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt="" style={{ width: '20px', height: '20px', borderRadius: '4px' }} />
+                                  <div style={{ position: 'relative', width: '20px', height: '20px' }}>
+                                    <Image src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt="" fill sizes="20px" style={{ objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
                                   <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
                                 </div>
                               ))}
@@ -1225,7 +1234,9 @@ export default function HomePage() {
                       {mediaDetailsExt.castWithRoles.map((actor, idx) => (
                         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '6px', borderRadius: '10px' }}>
                           {actor.profile_path ? (
-                            <img src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                            <div style={{ position: 'relative', width: '32px', height: '32px', flexShrink: 0 }}>
+                              <Image src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} alt="" fill sizes="32px" style={{ objectFit: 'cover', borderRadius: '50%' }} />
+                            </div>
                           ) : (
                             <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#3F3F46', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>👤</div>
                           )}
