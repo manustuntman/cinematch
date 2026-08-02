@@ -41,7 +41,6 @@ const AVERSIONS_LIST = [
 
 const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩‍👦', 'Coup de cœur ❤️', 'À revoir 🔄'];
 
-// Composant Skeleton pour le chargement
 function SkeletonCard() {
   return (
     <div className="skeleton-card" style={{ height: '300px', backgroundColor: '#27272A', borderRadius: '20px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
@@ -64,8 +63,8 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; 
     let isMounted = true;
     const fetchCastAndPlaylists = async () => {
       try {
-        const API_KEY = '93388a6035cae903edcb4051e1eb6e7b'; // Prochaine étape : on va sécuriser cette clé !
-        const res = await fetch(`https://api.themoviedb.org/3/${mediaType}/${item.id}/credits?api_key=${API_KEY}&language=fr-FR`);
+        // APPEL SÉCURISÉ VIA NOTRE ROUTE API INTERNE
+        const res = await fetch(`/api/tmdb?endpoint=/${mediaType}/${item.id}/credits&language=fr-FR`);
         const data = await res.json();
         if (isMounted && data.cast) {
           setCast(data.cast.slice(0, 2));
@@ -197,14 +196,12 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
   
-  // Auth & XP
   const [user, setUser] = useState<any>(null);
   const [userLevel, setUserLevel] = useState<number>(1);
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
-  // Nouveaux modes
   const [viewMode, setViewMode] = useState<'standard' | 'kids' | 'couple'>('standard');
-  const [isLoadingRecs, setIsLoadingRecs] = useState(false); // État pour les skeletons
+  const [isLoadingRecs, setIsLoadingRecs] = useState(false);
 
   const [mediaType, setMediaType] = useState<'movie' | 'tv'>('movie'); 
   const [preferences, setPreferences] = useState<number[]>([]);
@@ -239,13 +236,7 @@ export default function HomePage() {
     tagline: string;
     runtime: string;
   }>({
-    director: '',
-    castWithRoles: [],
-    providers: [],
-    freeProviders: [],
-    trailerKey: null,
-    tagline: '',
-    runtime: '',
+    director: '', castWithRoles: [], providers: [], freeProviders: [], trailerKey: null, tagline: '', runtime: '',
   });
   const [loadingExt, setLoadingExt] = useState(false);
 
@@ -295,10 +286,7 @@ export default function HomePage() {
   };
 
   const getExcludedKeywordsString = () => {
-    return selectedAversions
-      .map(id => AVERSIONS_LIST.find(a => a.id === id)?.keyword)
-      .filter(Boolean)
-      .join(',');
+    return selectedAversions.map(id => AVERSIONS_LIST.find(a => a.id === id)?.keyword).filter(Boolean).join(',');
   };
 
   const handleSearch = async (query: string) => {
@@ -308,8 +296,8 @@ export default function HomePage() {
       return;
     }
     try {
-      const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
-      const url = `https://api.themoviedb.org/3/search/${mediaType}?api_key=${API_KEY}&language=fr-FR&query=${encodeURIComponent(query)}&page=1`;
+      // APPEL SÉCURISÉ
+      const url = `/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&query=${encodeURIComponent(query)}&page=1`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
@@ -322,8 +310,8 @@ export default function HomePage() {
 
   const fetchTrending = async () => {
     try {
-      const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
-      const url = `https://api.themoviedb.org/3/trending/${mediaType}/week?api_key=${API_KEY}&language=fr-FR`;
+      // APPEL SÉCURISÉ
+      const url = `/api/tmdb?endpoint=/trending/${mediaType}/week&language=fr-FR`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
@@ -340,29 +328,27 @@ export default function HomePage() {
     setRecommendedMedia([]);
     
     try {
-      const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       let genreQuery = selectedGenres.join(',');
       let excludeParam = getExcludedKeywordsString();
       let certificationParam = '';
 
-      // Configuration spéciale pour les Modes
       if (viewMode === 'kids') {
-        genreQuery = '16,10751'; // Force Animation & Famille
-        excludeParam = '27,53,80,18'; // Exclut Horreur, Thriller, Crime, Drame
-        certificationParam = '&certification_country=FR&certification.lte=10'; // Limite d'âge FR (-10 ans max)
+        genreQuery = '16,10751'; 
+        excludeParam = '27,53,80,18'; 
+        certificationParam = '&certification_country=FR&certification.lte=10'; 
       } else if (viewMode === 'couple') {
-        genreQuery = '35,10749,12'; // Mix Comédie, Romance, Aventure
+        genreQuery = '35,10749,12'; 
       }
 
       const excludedStr = excludeParam ? `&without_genres=${excludeParam}&without_keywords=${excludeParam}` : '';
       const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
       
-      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc${excludedStr}${providersQuery}${certificationParam}&page=1`;
+      // APPEL SÉCURISÉ
+      const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc${excludedStr}${providersQuery}${certificationParam}&page=1`;
       
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
-        // Petit délai artificiel pour montrer la fluidité du Skeleton
         setTimeout(() => {
           setRecommendedMedia(data.results.slice(0, 20));
           setIsLoadingRecs(false);
@@ -380,8 +366,6 @@ export default function HomePage() {
     setAiResults([]);
 
     try {
-      const API_KEY_TMDB = '93388a6035cae903edcb4051e1eb6e7b';
-
       const aiRes = await fetch('/api/ai-recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -400,16 +384,14 @@ export default function HomePage() {
       const fetchedResults: any[] = [];
 
       for (const rec of aiData.recommendations) {
-        let tmdbRes = await fetch(
-          `https://api.themoviedb.org/3/search/${mediaType}?api_key=${API_KEY_TMDB}&language=fr-FR&query=${encodeURIComponent(rec.title)}&page=1`
-        );
+        // APPEL SÉCURISÉ
+        let tmdbRes = await fetch(`/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&query=${encodeURIComponent(rec.title)}&page=1`);
         let tmdbData = await tmdbRes.json();
 
         if (!tmdbData.results || tmdbData.results.length === 0) {
           const simplifiedTitle = rec.title.split(':')[0].split('-')[0].trim();
-          tmdbRes = await fetch(
-            `https://api.themoviedb.org/3/search/${mediaType}?api_key=${API_KEY_TMDB}&language=fr-FR&query=${encodeURIComponent(simplifiedTitle)}&page=1`
-          );
+          // APPEL SÉCURISÉ FALLBACK
+          tmdbRes = await fetch(`/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&query=${encodeURIComponent(simplifiedTitle)}&page=1`);
           tmdbData = await tmdbRes.json();
         }
 
@@ -439,7 +421,6 @@ export default function HomePage() {
     setIsSpinning(true);
     setRouletteMedia(null);
     try {
-      const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
       let genreQuery = preferences.length > 0 ? `&with_genres=${preferences.join(',')}` : '';
       let excludeParam = getExcludedKeywordsString();
       let certificationParam = '';
@@ -455,7 +436,8 @@ export default function HomePage() {
       const excludedStr = excludeParam ? `&without_keywords=${excludeParam}&without_genres=${excludeParam}` : '';
       const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
       
-      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc${genreQuery}${excludedStr}${providersQuery}${certificationParam}&page=${Math.floor(Math.random() * 5) + 1}`;
+      // APPEL SÉCURISÉ
+      const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&sort_by=popularity.desc${genreQuery}${excludedStr}${providersQuery}${certificationParam}&page=${Math.floor(Math.random() * 5) + 1}`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -476,12 +458,11 @@ export default function HomePage() {
   const fetchExtraDetails = async (id: string | number) => {
     setLoadingExt(true);
     try {
-      const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
-      
-      const detailRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${API_KEY}&language=fr-FR`);
+      // APPELS SÉCURISÉS COMBINÉS
+      const detailRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}&language=fr-FR`);
       const detailData = await detailRes.json();
 
-      const creditsRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}/credits?api_key=${API_KEY}&language=fr-FR`);
+      const creditsRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}/credits&language=fr-FR`);
       const creditsData = await creditsRes.json();
       
       const directorObj = mediaType === 'movie' 
@@ -495,16 +476,16 @@ export default function HomePage() {
         profile_path: c.profile_path
       })) : [];
 
-      const providersRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}/watch/providers?api_key=${API_KEY}`);
+      const providersRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}/watch/providers`);
       const providersData = await providersRes.json();
       const frProviders = providersData.results?.FR || {};
 
-      let videoRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}/videos?api_key=${API_KEY}&language=fr-FR`);
+      let videoRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}/videos&language=fr-FR`);
       let videoData = await videoRes.json();
       let trailer = videoData.results?.find((v: any) => (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube');
       
       if (!trailer) {
-        videoRes = await fetch(`https://api.themoviedb.org/3/${mediaType}/${id}/videos?api_key=${API_KEY}&language=en-US`);
+        videoRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}/videos&language=en-US`);
         videoData = await videoRes.json();
         trailer = videoData.results?.find((v: any) => (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube');
       }
@@ -936,7 +917,6 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* Les étapes suivantes se cachent si on a choisi un mode spécial pour aller plus vite */}
               {viewMode === 'standard' && (
                 <>
                   <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 2 sur 4</span>
@@ -1107,7 +1087,6 @@ export default function HomePage() {
               </button>
             </div>
             
-            {/* INTEGRATION DES SKELETONS LORS DU CHARGEMENT */}
             {isLoadingRecs ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {[1, 2, 3, 4, 5, 6].map(i => <SkeletonCard key={i} />)}
