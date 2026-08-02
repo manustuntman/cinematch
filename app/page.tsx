@@ -82,7 +82,7 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist }
         }
 
         if (currentUserId) {
-          const { data: plData } = await supabase.from('playlists').select('*').eq('user_id', currentUserId);
+          const { data: plData } = await supabase.from('playlists').select('*').eq('user_uid', currentUserId);
           if (isMounted && plData) setPlaylists(plData);
         }
       } catch (err) {
@@ -304,7 +304,7 @@ export default function HomePage() {
           setUserAvatarUrl(profileData.avatar_url);
         }
 
-        const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_id', uid);
+        const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_uid', uid);
         if (watchData) setUserWatchlist(watchData);
       }
     };
@@ -387,7 +387,7 @@ export default function HomePage() {
   const fetchUserPlaylists = async () => {
     if (!currentUserId) return;
     try {
-      const { data } = await supabase.from('playlists').select('*').eq('user_id', currentUserId);
+      const { data } = await supabase.from('playlists').select('*').eq('user_uid', currentUserId);
       if (data) setUserPlaylists(data);
     } catch (err) {
       console.error(err);
@@ -644,16 +644,16 @@ export default function HomePage() {
         .from('watchlist')
         .select('id')
         .eq('movie_id', movieIdStr)
-        .eq('user_id', currentUserId);
+        .eq('user_uid', currentUserId);
 
       if (checkError) throw checkError;
 
       if (existing && existing.length > 0) {
-        await supabase.from('watchlist').update({ status }).eq('movie_id', movieIdStr).eq('user_id', currentUserId);
+        await supabase.from('watchlist').update({ status }).eq('movie_id', movieIdStr).eq('user_uid', currentUserId);
       } else {
         const { error } = await supabase.from('watchlist').insert([
           {
-            user_id: currentUserId,
+            user_uid: currentUserId,
             movie_id: movieIdStr,
             title: title,
             poster_path: selectedMediaDetail.poster_path ? `https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}` : selectedMediaDetail.poster,
@@ -668,7 +668,7 @@ export default function HomePage() {
         if (error) throw error;
       }
 
-      const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_id', currentUserId);
+      const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_uid', currentUserId);
       if (watchData) setUserWatchlist(watchData);
 
       setFeedback(status === 'to_watch' ? '📌 Ajouté à la Watchlist !' : '👁️ Marqué comme vu !');
