@@ -282,7 +282,6 @@ export default function HomePage() {
     fetchRandomCarousel();
   }, [mediaType]);
 
-  // Carrousel aléatoire (tire des pages et des films au hasard)
   const fetchRandomCarousel = async () => {
     try {
       const randomPage = Math.floor(Math.random() * 20) + 1;
@@ -290,7 +289,6 @@ export default function HomePage() {
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
-        // On mélange un peu le tableau pour plus de hasard
         const shuffled = data.results.sort(() => 0.5 - Math.random());
         setCarouselMedia(shuffled.slice(0, 12));
       }
@@ -664,7 +662,7 @@ export default function HomePage() {
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
 
   return (
-    <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', margin: 0, padding: '0 16px 90px 16px', overflowX: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
+    <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', margin: 0, padding: '0 16px 110px 16px', overflowX: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
       
       <style jsx global>{`
         @keyframes scrollMarquee {
@@ -784,7 +782,7 @@ export default function HomePage() {
         </div>
 
         {feedback && (
-          <div style={{ position: 'fixed', bottom: '100px', right: '20px', backgroundColor: '#9333EA', color: '#FFF', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', zIndex: 2000, maxWidth: '350px' }}>
+          <div style={{ position: 'fixed', bottom: '110px', right: '20px', backgroundColor: '#9333EA', color: '#FFF', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', zIndex: 2000, maxWidth: '350px' }}>
             {feedback}
           </div>
         )}
@@ -1410,19 +1408,39 @@ export default function HomePage() {
 
       </div>
 
-      {/* BARRE DE NAVIGATION MOBILE (BOTTOM BAR) */}
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(24, 24, 27, 0.95)', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-around', padding: '12px 0 24px 0', zIndex: 1000, backdropFilter: 'blur(10px)' }}>
-        <a href="/" style={{ color: '#9333EA', textDecoration: 'none', textAlign: 'center', fontSize: '20px' }}>
-          🏠<span style={{ display: 'block', fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Accueil</span>
+      {/* BARRE DE NAVIGATION FLOTTANTE (FLOATING DOCK) */}
+      <nav style={{ 
+        position: 'fixed', 
+        bottom: '20px', 
+        left: '50%', 
+        transform: 'translateX(-50%)', 
+        width: '90%', 
+        maxWidth: '400px', 
+        backgroundColor: 'rgba(24, 24, 27, 0.85)', 
+        border: '1px solid rgba(255, 255, 255, 0.15)', 
+        display: 'flex', 
+        justifyContent: 'space-around', 
+        padding: '10px 0', 
+        borderRadius: '35px', 
+        zIndex: 1000, 
+        backdropFilter: 'blur(16px)',
+        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.8)'
+      }}>
+        <a href="/" style={{ color: '#9333EA', textDecoration: 'none', textAlign: 'center', fontSize: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span>🏠</span>
+          <span style={{ fontSize: '9px', marginTop: '2px', fontWeight: 'bold' }}>Accueil</span>
         </a>
-        <a href="/potecorn-party" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '20px' }}>
-          🔥<span style={{ display: 'block', fontSize: '10px', marginTop: '4px' }}>Party</span>
+        <a href="/potecorn-party" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span>🔥</span>
+          <span style={{ fontSize: '9px', marginTop: '2px' }}>Party</span>
         </a>
-        <a href="/playlists" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '20px' }}>
-          🎵<span style={{ display: 'block', fontSize: '10px', marginTop: '4px' }}>Playlists</span>
+        <a href="/playlists" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span>🎵</span>
+          <span style={{ fontSize: '9px', marginTop: '2px' }}>Playlists</span>
         </a>
-        <a href="/profile" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '20px' }}>
-          👤<span style={{ display: 'block', fontSize: '10px', marginTop: '4px' }}>Profil</span>
+        <a href="/profile" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', fontSize: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span>👤</span>
+          <span style={{ fontSize: '9px', marginTop: '2px' }}>Profil</span>
         </a>
       </nav>
 
