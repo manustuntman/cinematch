@@ -41,6 +41,19 @@ const AVERSIONS_LIST = [
 
 const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩‍👦', 'Coup de cœur ❤️', 'À revoir 🔄'];
 
+// Composant Skeleton pour le chargement
+function SkeletonCard() {
+  return (
+    <div className="skeleton-card" style={{ height: '300px', backgroundColor: '#27272A', borderRadius: '20px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+      <div className="skeleton-anim" style={{ width: '100%', height: '200px', backgroundColor: '#3F3F46' }}></div>
+      <div style={{ padding: '12px' }}>
+        <div className="skeleton-anim" style={{ width: '80%', height: '14px', backgroundColor: '#3F3F46', borderRadius: '4px', marginBottom: '8px' }}></div>
+        <div className="skeleton-anim" style={{ width: '100%', height: '40px', backgroundColor: '#3F3F46', borderRadius: '8px' }}></div>
+      </div>
+    </div>
+  );
+}
+
 function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void; currentUserId: string }) {
   const [cast, setCast] = useState<any[]>([]);
   const [playlists, setPlaylists] = useState<any[]>([]);
@@ -51,7 +64,7 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; 
     let isMounted = true;
     const fetchCastAndPlaylists = async () => {
       try {
-        const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
+        const API_KEY = '93388a6035cae903edcb4051e1eb6e7b'; // Prochaine étape : on va sécuriser cette clé !
         const res = await fetch(`https://api.themoviedb.org/3/${mediaType}/${item.id}/credits?api_key=${API_KEY}&language=fr-FR`);
         const data = await res.json();
         if (isMounted && data.cast) {
@@ -108,14 +121,18 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId }: { item: any; 
         justifyContent: 'space-between',
         boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
         cursor: 'pointer',
-        position: 'relative'
+        position: 'relative',
+        transition: 'transform 0.2s ease',
       }}
+      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+      onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
     >
       <div>
         <div style={{ position: 'relative' }}>
           <img 
             src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450'} 
             alt={title} 
+            loading="lazy"
             style={{ width: '100%', height: '200px', objectFit: 'cover' }} 
           />
           <span style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: 'rgba(0,0,0,0.75)', color: '#FBBF24', fontSize: '10px', fontWeight: '800', padding: '3px 8px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
@@ -185,6 +202,10 @@ export default function HomePage() {
   const [userLevel, setUserLevel] = useState<number>(1);
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
+  // Nouveaux modes
+  const [viewMode, setViewMode] = useState<'standard' | 'kids' | 'couple'>('standard');
+  const [isLoadingRecs, setIsLoadingRecs] = useState(false); // État pour les skeletons
+
   const [mediaType, setMediaType] = useState<'movie' | 'tv'>('movie'); 
   const [preferences, setPreferences] = useState<number[]>([]);
   const [selectedProviders, setSelectedProviders] = useState<number[]>([]);
@@ -250,7 +271,6 @@ export default function HomePage() {
       setCurrentUserId(uid);
 
       if (uid) {
-        // Calcul du niveau (XP) basé sur les likes
         const { data: likes } = await supabase.from('user_swipes').select('id').eq('user_uid', uid).eq('action', 'liked');
         const likesCount = likes ? likes.length : 0;
         
@@ -316,23 +336,41 @@ export default function HomePage() {
   };
 
   const fetchRecommendations = async (selectedGenres: number[]) => {
+    setIsLoadingRecs(true);
+    setRecommendedMedia([]);
+    
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
-      const genreQuery = selectedGenres.join(',');
-      const excluded = getExcludedKeywordsString();
-      const excludeParam = excluded ? `&without_keywords=${excluded}` : '';
-      
+      let genreQuery = selectedGenres.join(',');
+      let excludeParam = getExcludedKeywordsString();
+      let certificationParam = '';
+
+      // Configuration spéciale pour les Modes
+      if (viewMode === 'kids') {
+        genreQuery = '16,10751'; // Force Animation & Famille
+        excludeParam = '27,53,80,18'; // Exclut Horreur, Thriller, Crime, Drame
+        certificationParam = '&certification_country=FR&certification.lte=10'; // Limite d'âge FR (-10 ans max)
+      } else if (viewMode === 'couple') {
+        genreQuery = '35,10749,12'; // Mix Comédie, Romance, Aventure
+      }
+
+      const excludedStr = excludeParam ? `&without_genres=${excludeParam}&without_keywords=${excludeParam}` : '';
       const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
       
-      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc${excludeParam}${providersQuery}&page=1`;
+      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc${excludedStr}${providersQuery}${certificationParam}&page=1`;
       
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
-        setRecommendedMedia(data.results.slice(0, 20));
+        // Petit délai artificiel pour montrer la fluidité du Skeleton
+        setTimeout(() => {
+          setRecommendedMedia(data.results.slice(0, 20));
+          setIsLoadingRecs(false);
+        }, 600);
       }
     } catch (err) {
       console.error(err);
+      setIsLoadingRecs(false);
     }
   };
 
@@ -402,12 +440,22 @@ export default function HomePage() {
     setRouletteMedia(null);
     try {
       const API_KEY = '93388a6035cae903edcb4051e1eb6e7b';
-      const genreParam = preferences.length > 0 ? `&with_genres=${preferences.join(',')}` : '';
-      const excluded = getExcludedKeywordsString();
-      const excludeParam = excluded ? `&without_keywords=${excluded}` : '';
+      let genreQuery = preferences.length > 0 ? `&with_genres=${preferences.join(',')}` : '';
+      let excludeParam = getExcludedKeywordsString();
+      let certificationParam = '';
+
+      if (viewMode === 'kids') {
+        genreQuery = '&with_genres=16,10751';
+        excludeParam = '27,53,80,18';
+        certificationParam = '&certification_country=FR&certification.lte=10';
+      } else if (viewMode === 'couple') {
+        genreQuery = '&with_genres=35,10749,12';
+      }
+
+      const excludedStr = excludeParam ? `&without_keywords=${excludeParam}&without_genres=${excludeParam}` : '';
       const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
       
-      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc${genreParam}${excludeParam}${providersQuery}&page=${Math.floor(Math.random() * 5) + 1}`;
+      const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${API_KEY}&language=fr-FR&sort_by=popularity.desc${genreQuery}${excludedStr}${providersQuery}${certificationParam}&page=${Math.floor(Math.random() * 5) + 1}`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -608,11 +656,20 @@ export default function HomePage() {
         .animate-marquee:hover {
           animation-play-state: paused;
         }
+        @keyframes shimmer {
+          0% { background-position: -400px 0; }
+          100% { background-position: 400px 0; }
+        }
+        .skeleton-anim {
+          animation: shimmer 1.5s infinite linear;
+          background: linear-gradient(to right, #3F3F46 4%, #52525B 25%, #3F3F46 36%);
+          background-size: 800px 100%;
+        }
       `}</style>
 
       <div style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
         
-        {/* HEADER AVEC NIVEAU XP DYNAMIQUE */}
+        {/* HEADER */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', marginBottom: '16px' }}>
           <div>
             <img 
@@ -669,7 +726,7 @@ export default function HomePage() {
                   onClick={() => { openMediaModal(item); setSearchResults([]); setSearchQuery(''); }}
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', cursor: 'pointer' }}
                 >
-                  <img src={item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : 'https://via.placeholder.com/40'} alt="" style={{ width: '36px', height: '50px', objectFit: 'cover', borderRadius: '6px' }} />
+                  <img src={item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : 'https://via.placeholder.com/40'} alt="" loading="lazy" style={{ width: '36px', height: '50px', objectFit: 'cover', borderRadius: '6px' }} />
                   <div>
                     <h4 style={{ fontSize: '13px', margin: '0 0 2px 0', color: '#FFF' }}>{item.title || item.name}</h4>
                     <span style={{ fontSize: '10px', color: '#A1A1AA' }}>★ {item.vote_average?.toFixed(1)}</span>
@@ -720,6 +777,7 @@ export default function HomePage() {
                   <img 
                     src={item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : 'https://via.placeholder.com/80x115'} 
                     alt="" 
+                    loading="lazy"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                   />
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.75)', padding: '2px 4px', fontSize: '8px', color: '#FBBF24', textAlign: 'center', fontWeight: '700' }}>
@@ -731,7 +789,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ASSISTANT IA (PROMPT INTELLIGENT) */}
+        {/* ASSISTANT IA */}
         {!isSetupComplete && (
           <div style={{ 
             background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.25), rgba(59, 130, 246, 0.2))', 
@@ -808,7 +866,7 @@ export default function HomePage() {
                       cursor: 'pointer'
                     }}
                   >
-                    <img src={item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : 'https://via.placeholder.com/130x180'} alt="" style={{ width: '100%', height: '130px', objectFit: 'cover' }} />
+                    <img src={item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : 'https://via.placeholder.com/130x180'} alt="" loading="lazy" style={{ width: '100%', height: '130px', objectFit: 'cover' }} />
                     <div style={{ padding: '8px' }}>
                       <h4 style={{ fontSize: '11px', fontWeight: '800', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>{item.title || item.name}</h4>
                       <span style={{ fontSize: '9px', color: '#C084FC', fontWeight: '700', display: 'block' }}>★ {item.vote_average?.toFixed(1)} / 10</span>
@@ -823,7 +881,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* QUESTIONNAIRE PRINCIPAL COMPLET (AVEC PLATEFORMES) */}
+        {/* QUESTIONNAIRE PRINCIPAL AVEC NOUVEAUX MODES UX */}
         {!isSetupComplete ? (
           <div>
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '24px', padding: '24px', textAlign: 'center', marginBottom: '24px' }}>
@@ -831,77 +889,87 @@ export default function HomePage() {
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 1 sur 4</span>
               <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>Que veux-tu regarder aujourd'hui ? 🍿</h2>
               
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                 <button
-                  onClick={() => { setMediaType('movie'); setPreferences([]); }}
+                  onClick={() => { setMediaType('movie'); setPreferences([]); setViewMode('standard'); }}
                   style={{
-                    flex: 1,
-                    backgroundColor: mediaType === 'movie' ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
-                    border: mediaType === 'movie' ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
-                    color: '#FFF',
-                    padding: '10px',
-                    borderRadius: '14px',
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    cursor: 'pointer'
+                    backgroundColor: mediaType === 'movie' && viewMode === 'standard' ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
+                    border: mediaType === 'movie' && viewMode === 'standard' ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#FFF', padding: '10px', borderRadius: '14px', fontSize: '13px', fontWeight: '700', cursor: 'pointer'
                   }}
                 >
                   🎬 Un Film
                 </button>
                 <button
-                  onClick={() => { setMediaType('tv'); setPreferences([]); }}
+                  onClick={() => { setMediaType('tv'); setPreferences([]); setViewMode('standard'); }}
                   style={{
-                    flex: 1,
-                    backgroundColor: mediaType === 'tv' ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
-                    border: mediaType === 'tv' ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
-                    color: '#FFF',
-                    padding: '10px',
-                    borderRadius: '14px',
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    cursor: 'pointer'
+                    backgroundColor: mediaType === 'tv' && viewMode === 'standard' ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
+                    border: mediaType === 'tv' && viewMode === 'standard' ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#FFF', padding: '10px', borderRadius: '14px', fontSize: '13px', fontWeight: '700', cursor: 'pointer'
                   }}
                 >
                   📺 Une Série TV
                 </button>
               </div>
 
-              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 2 sur 4</span>
-              <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>Tes genres préférés :</h3>
-              
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
-                {currentGenresList.map((g) => {
-                  const selected = preferences.includes(g.id);
-                  return (
-                    <button
-                      key={g.id}
-                      onClick={() => {
-                        if (selected) setPreferences(preferences.filter(id => id !== g.id));
-                        else setPreferences([...preferences, g.id]);
-                      }}
-                      style={{
-                        backgroundColor: selected ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
-                        border: selected ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
-                        color: '#FFFFFF',
-                        padding: '6px 12px',
-                        borderRadius: '16px',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {g.name}
-                    </button>
-                  );
-                })}
+              {/* NOUVEAUX BOUTONS MODES SPÉCIAUX */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '24px' }}>
+                <button
+                  onClick={() => { setViewMode('kids'); setPreferences([]); }}
+                  style={{
+                    backgroundColor: viewMode === 'kids' ? '#10B981' : 'rgba(16, 185, 129, 0.1)',
+                    border: viewMode === 'kids' ? '1px solid #34D399' : '1px solid rgba(16, 185, 129, 0.3)',
+                    color: viewMode === 'kids' ? '#000' : '#34D399', padding: '10px', borderRadius: '14px', fontSize: '13px', fontWeight: '800', cursor: 'pointer'
+                  }}
+                >
+                  🧸 Mode Kids
+                </button>
+                <button
+                  onClick={() => { setViewMode('couple'); setPreferences([]); }}
+                  style={{
+                    backgroundColor: viewMode === 'couple' ? '#EF4444' : 'rgba(239, 68, 68, 0.1)',
+                    border: viewMode === 'couple' ? '1px solid #F87171' : '1px solid rgba(239, 68, 68, 0.3)',
+                    color: viewMode === 'couple' ? '#FFF' : '#F87171', padding: '10px', borderRadius: '14px', fontSize: '13px', fontWeight: '800', cursor: 'pointer'
+                  }}
+                >
+                  ❤️ Soirée Couple
+                </button>
               </div>
 
-              {/* NOUVELLE ÉTAPE : PLATEFORMES DE STREAMING */}
-              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#60A5FA', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 3 sur 4 (Optionnel)</span>
-              <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: '#93C5FD' }}>Quels abonnements as-tu ?</h3>
-              <p style={{ fontSize: '11px', color: '#A1A1AA', marginBottom: '12px' }}>Sélectionne tes plateformes pour filtrer les résultats.</p>
+              {/* Les étapes suivantes se cachent si on a choisi un mode spécial pour aller plus vite */}
+              {viewMode === 'standard' && (
+                <>
+                  <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#C084FC', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 2 sur 4</span>
+                  <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>Tes genres préférés :</h3>
+                  
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
+                    {currentGenresList.map((g) => {
+                      const selected = preferences.includes(g.id);
+                      return (
+                        <button
+                          key={g.id}
+                          onClick={() => {
+                            if (selected) setPreferences(preferences.filter(id => id !== g.id));
+                            else setPreferences([...preferences, g.id]);
+                          }}
+                          style={{
+                            backgroundColor: selected ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
+                            border: selected ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
+                            color: '#FFFFFF', padding: '6px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: '600', cursor: 'pointer'
+                          }}
+                        >
+                          {g.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
+              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#60A5FA', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 3 sur 4</span>
+              <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: '#93C5FD' }}>Quels abonnements as-tu ?</h3>
+              
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px', marginTop: '12px' }}>
                 {STREAMING_PROVIDERS.map((prov) => {
                   const selected = selectedProviders.includes(prov.id);
                   return (
@@ -914,12 +982,7 @@ export default function HomePage() {
                       style={{
                         backgroundColor: selected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.03)',
                         border: selected ? '1px solid #3B82F6' : '1px solid rgba(255, 255, 255, 0.08)',
-                        color: selected ? '#93C5FD' : '#A1A1AA',
-                        padding: '6px 12px',
-                        borderRadius: '16px',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
+                        color: selected ? '#93C5FD' : '#A1A1AA', padding: '6px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: '600', cursor: 'pointer'
                       }}
                     >
                       {prov.name}
@@ -928,53 +991,46 @@ export default function HomePage() {
                 })}
               </div>
 
-              <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#EF4444', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 4 sur 4 (Optionnel)</span>
-              <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: '#F87171' }}>Écarter ce que tu N'AIMES PAS :</h3>
-              <p style={{ fontSize: '11px', color: '#A1A1AA', marginBottom: '12px' }}>Sélectionne tes phobies ou éléments à exclure.</p>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}>
-                {AVERSIONS_LIST.map((av) => {
-                  const selected = selectedAversions.includes(av.id);
-                  return (
-                    <button
-                      key={av.id}
-                      onClick={() => {
-                        if (selected) setSelectedAversions(selectedAversions.filter(id => id !== av.id));
-                        else setSelectedAversions([...selectedAversions, av.id]);
-                      }}
-                      style={{
-                        backgroundColor: selected ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.03)',
-                        border: selected ? '1px solid #EF4444' : '1px solid rgba(255, 255, 255, 0.08)',
-                        color: selected ? '#F87171' : '#A1A1AA',
-                        padding: '6px 12px',
-                        borderRadius: '16px',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {av.name}
-                    </button>
-                  );
-                })}
-              </div>
+              {viewMode === 'standard' && (
+                <>
+                  <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: '#EF4444', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Étape 4 sur 4 (Optionnel)</span>
+                  <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: '#F87171' }}>Écarter ce que tu N'AIMES PAS :</h3>
+                  
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '24px', marginTop: '12px' }}>
+                    {AVERSIONS_LIST.map((av) => {
+                      const selected = selectedAversions.includes(av.id);
+                      return (
+                        <button
+                          key={av.id}
+                          onClick={() => {
+                            if (selected) setSelectedAversions(selectedAversions.filter(id => id !== av.id));
+                            else setSelectedAversions([...selectedAversions, av.id]);
+                          }}
+                          style={{
+                            backgroundColor: selected ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                            border: selected ? '1px solid #EF4444' : '1px solid rgba(255, 255, 255, 0.08)',
+                            color: selected ? '#F87171' : '#A1A1AA', padding: '6px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: '600', cursor: 'pointer'
+                          }}
+                        >
+                          {av.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
 
               <button
-                disabled={preferences.length === 0}
+                disabled={viewMode === 'standard' && preferences.length === 0}
                 onClick={() => {
                   setIsSetupComplete(true);
                   fetchRecommendations(preferences);
                 }}
                 style={{
                   width: '100%',
-                  backgroundColor: preferences.length > 0 ? '#9333EA' : 'rgba(255, 255, 255, 0.1)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  padding: '12px',
-                  borderRadius: '14px',
-                  fontWeight: '700',
-                  fontSize: '13px',
-                  cursor: preferences.length > 0 ? 'pointer' : 'not-allowed'
+                  backgroundColor: (viewMode !== 'standard' || preferences.length > 0) ? '#9333EA' : 'rgba(255, 255, 255, 0.1)',
+                  color: '#FFFFFF', border: 'none', padding: '12px', borderRadius: '14px', fontWeight: '800', fontSize: '13px', 
+                  cursor: (viewMode !== 'standard' || preferences.length > 0) ? 'pointer' : 'not-allowed'
                 }}
               >
                 Générer ma sélection personnalisée ✨
@@ -985,14 +1041,11 @@ export default function HomePage() {
             <div style={{ 
               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(236, 72, 153, 0.15))', 
               border: '1px solid rgba(192, 132, 252, 0.4)', 
-              borderRadius: '24px', 
-              padding: '20px', 
-              textAlign: 'center', 
-              marginBottom: '32px',
+              borderRadius: '24px', padding: '20px', textAlign: 'center', marginBottom: '32px',
               boxShadow: '0 10px 30px -5px rgba(147, 51, 234, 0.3)'
             }}>
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '2px', color: '#FBBF24', textTransform: 'uppercase' }}>
-                🎰 Mode Surprise ({mediaType === 'movie' ? 'Film' : 'Série'})
+                🎰 Mode Surprise
               </span>
               <h3 style={{ fontSize: '18px', fontWeight: '800', margin: '4px 0 12px 0', color: '#FFF' }}>
                 Laisse le hasard choisir pour toi !
@@ -1002,23 +1055,16 @@ export default function HomePage() {
                 onClick={fetchRandomMedia}
                 disabled={isSpinning}
                 style={{
-                  backgroundColor: isSpinning ? '#6B21A8' : '#FBBF24',
-                  color: '#000',
-                  border: 'none',
-                  fontWeight: '800',
-                  fontSize: '13px',
-                  padding: '12px 24px',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(251, 191, 36, 0.4)'
+                  backgroundColor: isSpinning ? '#6B21A8' : '#FBBF24', color: '#000', border: 'none', fontWeight: '800', fontSize: '13px', 
+                  padding: '12px 24px', borderRadius: '16px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(251, 191, 36, 0.4)'
                 }}
               >
-                {isSpinning ? '🎰 Tirage en cours...' : `💥 Lancer la Roulette (${mediaType === 'movie' ? 'Films' : 'Séries'})`}
+                {isSpinning ? '🎰 Tirage en cours...' : `💥 Lancer la Roulette`}
               </button>
 
               {rouletteMedia && !isSpinning && (
                 <div style={{ marginTop: '16px', backgroundColor: 'rgba(24, 24, 27, 0.95)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left' }}>
-                  <img src={`https://image.tmdb.org/t/p/w500${rouletteMedia.poster_path}`} alt="" style={{ width: '65px', height: '95px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+                  <img src={`https://image.tmdb.org/t/p/w500${rouletteMedia.poster_path}`} alt="" loading="lazy" style={{ width: '65px', height: '95px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
                   
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: '9px', color: '#FBBF24', fontWeight: '700', textTransform: 'uppercase' }}>🎯 Résultat roulette :</span>
@@ -1028,27 +1074,6 @@ export default function HomePage() {
                       Voir la fiche complète →
                     </span>
                   </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-                    <button 
-                      onClick={() => {
-                        setSelectedMediaDetail(rouletteMedia);
-                        setTimeout(() => saveToSupabaseWithNotebook('watched'), 50);
-                      }}
-                      style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', padding: '8px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                    >
-                      👁️ Vu
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setSelectedMediaDetail(rouletteMedia);
-                        setTimeout(() => saveToSupabaseWithNotebook('to_watch'), 50);
-                      }}
-                      style={{ backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '8px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                    >
-                      📌 Watchlist
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
@@ -1056,7 +1081,7 @@ export default function HomePage() {
             {/* TENDANCES */}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px' }}>
-                🔥 Tendances {mediaType === 'movie' ? 'Films' : 'Séries'} ({trendingMedia.length})
+                🔥 Tendances
               </h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {trendingMedia.map((item) => (
@@ -1069,14 +1094,31 @@ export default function HomePage() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#C084FC' }}>
-                🎯 Sélection pour toi
+                {viewMode === 'kids' ? '🧸 Sélection Kids' : viewMode === 'couple' ? '❤️ Sélection Soirée Duo' : '🎯 Sélection pour toi'}
               </h2>
+              <button 
+                onClick={() => setIsSetupComplete(false)} 
+                style={{ 
+                  backgroundColor: 'rgba(255,255,255,0.08)', color: '#FFF', border: '1px solid rgba(255, 255, 255, 0.15)', 
+                  padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' 
+                }}
+              >
+                ✏️ Modifier
+              </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
-              {recommendedMedia.map((item) => (
-                <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} />
-              ))}
-            </div>
+            
+            {/* INTEGRATION DES SKELETONS LORS DU CHARGEMENT */}
+            {isLoadingRecs ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
+                {[1, 2, 3, 4, 5, 6].map(i => <SkeletonCard key={i} />)}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
+                {recommendedMedia.map((item) => (
+                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1092,13 +1134,7 @@ export default function HomePage() {
                   onClick={() => setActiveTab('info')}
                   style={{
                     backgroundColor: activeTab === 'info' ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
-                    color: '#FFF',
-                    border: 'none',
-                    padding: '6px 14px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    cursor: 'pointer'
+                    color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
                   }}
                 >
                   🎬 Fiche {mediaType === 'movie' ? 'Film' : 'Série'}
@@ -1107,16 +1143,7 @@ export default function HomePage() {
                   onClick={() => setActiveTab('xray')}
                   style={{
                     backgroundColor: activeTab === 'xray' ? '#FBBF24' : 'rgba(255, 255, 255, 0.05)',
-                    color: activeTab === 'xray' ? '#000' : '#FFF',
-                    border: 'none',
-                    padding: '6px 14px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    fontWeight: '800',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
+                    color: activeTab === 'xray' ? '#000' : '#FFF', border: 'none', padding: '6px 14px', borderRadius: '12px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
                   }}
                 >
                   ⚡ X-Ray
@@ -1126,7 +1153,7 @@ export default function HomePage() {
               {activeTab === 'info' && (
                 <div>
                   <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                    <img src={`https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}`} alt="" style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
+                    <img src={`https://image.tmdb.org/t/p/w500${selectedMediaDetail.poster_path}`} alt="" loading="lazy" style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
                     <div style={{ flex: 1 }}>
                       <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 4px 0' }}>{selectedMediaDetail.title || selectedMediaDetail.name}</h2>
                       <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '8px', display: 'inline-block', marginBottom: '8px' }}>
@@ -1186,9 +1213,6 @@ export default function HomePage() {
                         {mediaDetailsExt.freeProviders.length === 0 && mediaDetailsExt.providers.length === 0 && (
                           <div>
                             <span style={{ fontSize: '11px', color: '#A1A1AA', fontWeight: '700', display: 'block', marginBottom: '8px' }}>🚫 Indisponible en streaming en France</span>
-                            <a href={`https://www.google.com/search?q=regarder+${encodeURIComponent(selectedMediaDetail.title || selectedMediaDetail.name)+'+streaming+vod'}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255,255,255,0.08)', color: '#FFF', textDecoration: 'none', fontSize: '11px', fontWeight: '700', padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)' }}>
-                              🔍 Chercher en VOD / Achat web →
-                            </a>
                           </div>
                         )}
                       </div>
@@ -1233,18 +1257,6 @@ export default function HomePage() {
                         </div>
                       ))}
                     </div>
-                  </div>
-
-                  <div style={{ marginBottom: '16px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '12px', borderRadius: '12px' }}>
-                    <h4 style={{ fontSize: '12px', color: '#FBBF24', fontWeight: '700', margin: '0 0 6px 0' }}>🎵 Bande Originale & Musique</h4>
-                    <a
-                      href={`https://open.spotify.com/search/${encodeURIComponent((selectedMediaDetail.title || selectedMediaDetail.name) + ' soundtrack')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#1DB954', color: '#000', textDecoration: 'none', fontSize: '11px', fontWeight: '800', padding: '6px 12px', borderRadius: '8px' }}
-                    >
-                      🎧 Écouter la B.O. sur Spotify →
-                    </a>
                   </div>
                 </div>
               )}
@@ -1311,11 +1323,7 @@ export default function HomePage() {
                           style={{
                             backgroundColor: active ? '#9333EA' : 'rgba(255, 255, 255, 0.05)',
                             border: active ? '1px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
-                            color: '#FFF',
-                            fontSize: '10px',
-                            padding: '4px 10px',
-                            borderRadius: '12px',
-                            cursor: 'pointer'
+                            color: '#FFF', fontSize: '10px', padding: '4px 10px', borderRadius: '12px', cursor: 'pointer'
                           }}
                         >
                           {tag}
@@ -1332,17 +1340,8 @@ export default function HomePage() {
                     onChange={(e) => setUserNotes(e.target.value)}
                     placeholder="Écris ce que tu as pensé..."
                     style={{
-                      width: '100%',
-                      height: '70px',
-                      backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: '12px',
-                      color: '#FFF',
-                      padding: '10px',
-                      fontSize: '12px',
-                      fontFamily: 'inherit',
-                      boxSizing: 'border-box',
-                      resize: 'none'
+                      width: '100%', height: '70px', backgroundColor: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '12px', color: '#FFF', padding: '10px', fontSize: '12px', boxSizing: 'border-box', resize: 'none'
                     }}
                   />
                 </div>
@@ -1352,13 +1351,13 @@ export default function HomePage() {
                     onClick={() => saveToSupabaseWithNotebook('watched')}
                     style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                   >
-                    👁️ Marquer comme Vu
+                    👁️ Marquer Vu
                   </button>
                   <button 
                     onClick={() => saveToSupabaseWithNotebook('to_watch')}
                     style={{ flex: 1, backgroundColor: '#9333EA', color: '#FFF', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                   >
-                    📌 Ajouter Watchlist
+                    📌 Watchlist
                   </button>
                 </div>
               </div>
@@ -1370,19 +1369,7 @@ export default function HomePage() {
       </div>
 
       {/* BARRE DE NAVIGATION MOBILE (BOTTOM BAR) */}
-      <nav style={{ 
-        position: 'fixed', 
-        bottom: 0, 
-        left: 0, 
-        right: 0, 
-        backgroundColor: 'rgba(24, 24, 27, 0.95)', 
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
-        display: 'flex', 
-        justifyContent: 'space-around', 
-        padding: '12px 0 24px 0', 
-        zIndex: 1000, 
-        backdropFilter: 'blur(10px)' 
-      }}>
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(24, 24, 27, 0.95)', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-around', padding: '12px 0 24px 0', zIndex: 1000, backdropFilter: 'blur(10px)' }}>
         <a href="/" style={{ color: '#9333EA', textDecoration: 'none', textAlign: 'center', fontSize: '20px' }}>
           🏠<span style={{ display: 'block', fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>Accueil</span>
         </a>
