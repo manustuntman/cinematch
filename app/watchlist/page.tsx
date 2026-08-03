@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 
 const AVAILABLE_TAGS = ['Cinema 🍿', 'En solo 🎧', 'En famille 👨‍👩‍👦', 'Coup de cœur ❤️', 'À revoir 🔄'];
@@ -10,7 +11,12 @@ export default function WatchlistPage() {
   const [loading, setLoading] = useState(true);
   
   const [selectedMovie, setSelectedMovie] = useState<any>(null);
-  const [movieDetailsExt, setMovieDetailsExt] = useState<{ director: string; cast: string[]; providers: any[]; trailerKey: string | null }>({
+  const [movieDetailsExt, setMovieDetailsExt] = useState<{ 
+    director: string; 
+    cast: string[]; 
+    providers: any[]; 
+    trailerKey: string | null; 
+  }>({
     director: '',
     cast: [],
     providers: [],
@@ -192,9 +198,11 @@ export default function WatchlistPage() {
                     <div 
                       key={item.id} 
                       onClick={() => openMovieModal(item)}
-                      style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
+                      style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', position: 'relative' }}
                     >
-                      <img src={item.poster_path} alt={item.title} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
+                      <div style={{ position: 'relative', width: '100%', height: '180px' }}>
+                        <Image src={item.poster_path || 'https://via.placeholder.com/130x180'} alt={item.title} fill sizes="130px" style={{ objectFit: 'cover' }} />
+                      </div>
                       <div style={{ padding: '10px' }}>
                         <h3 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
                         {item.user_rating > 0 && <span style={{ fontSize: '10px', color: '#FBBF24' }}>{'⭐'.repeat(item.user_rating)}</span>}
@@ -214,9 +222,11 @@ export default function WatchlistPage() {
                     <div 
                       key={item.id} 
                       onClick={() => openMovieModal(item)}
-                      style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
+                      style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', position: 'relative' }}
                     >
-                      <img src={item.poster_path} alt={item.title} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
+                      <div style={{ position: 'relative', width: '100%', height: '180px' }}>
+                        <Image src={item.poster_path || 'https://via.placeholder.com/130x180'} alt={item.title} fill sizes="130px" style={{ objectFit: 'cover' }} />
+                      </div>
                       <div style={{ padding: '10px' }}>
                         <h3 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
                         {item.user_rating > 0 && <span style={{ fontSize: '10px', color: '#FBBF24' }}>{'⭐'.repeat(item.user_rating)}</span>}
@@ -237,7 +247,9 @@ export default function WatchlistPage() {
               <button onClick={() => setSelectedMovie(null)} style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#FFF', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: '700', zIndex: 10 }}>✕</button>
 
               <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                <img src={selectedMovie.poster_path} alt={selectedMovie.title} style={{ width: '100px', height: '140px', objectFit: 'cover', borderRadius: '12px' }} />
+                <div style={{ position: 'relative', width: '100px', height: '140px', flexShrink: 0 }}>
+                  <Image src={selectedMovie.poster_path || 'https://via.placeholder.com/100x140'} alt={selectedMovie.title} fill sizes="100px" style={{ objectFit: 'cover', borderRadius: '12px' }} />
+                </div>
                 <div style={{ flex: 1 }}>
                   <h2 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 4px 0' }}>{selectedMovie.title}</h2>
                   <span style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '8px', display: 'inline-block', marginBottom: '8px' }}>
@@ -251,6 +263,29 @@ export default function WatchlistPage() {
                     <strong style={{ color: '#FFF' }}>Casting :</strong> {loadingExt ? 'Chargement...' : movieDetailsExt.cast.length > 0 ? movieDetailsExt.cast.join(', ') : 'N/A'}
                   </p>
                 </div>
+              </div>
+
+              {/* DISPONIBILITÉS STREAMING (Amélioration 2) */}
+              <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#A1A1AA', display: 'block', marginBottom: '8px' }}>
+                  📺 Où le regarder en France :
+                </span>
+                {loadingExt ? (
+                  <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Recherche des plateformes...</span>
+                ) : movieDetailsExt.providers.length > 0 ? (
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {movieDetailsExt.providers.map((provider: any) => (
+                      <div key={provider.provider_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px 8px', borderRadius: '8px' }}>
+                        <div style={{ position: 'relative', width: '20px', height: '20px' }}>
+                          <Image src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt="" fill sizes="20px" style={{ objectFit: 'cover', borderRadius: '4px' }} />
+                        </div>
+                        <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '600' }}>{provider.provider_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '11px', color: '#A1A1AA' }}>Aucun abonnement streaming répertorié en France.</span>
+                )}
               </div>
 
               {movieDetailsExt.trailerKey && (
