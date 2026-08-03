@@ -64,14 +64,24 @@ function SkeletonCard() {
 }
 
 // 🔮 COMPOSANT DE L'ORACLE POTE-CORN (IA SUR-MESURE)
-function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; userWatchlist: any[]; onOpenMovie: (movie: any) => void }) {
+function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (movie: any) => void }) {
   const [oracleText, setOracleText] = useState<string>('Analyse de ton profil cinéphile en cours...');
   const [suggestedMovie, setSuggestedMovie] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const generatePersonalizedAdvice = async () => {
+      if (!userId) return;
+
       try {
+        const { data: watchData } = await supabase
+          .from('watchlist')
+          .select('title, status')
+          .eq('user_uid', userId)
+          .eq('status', 'watched');
+
+        const watchedTitles = watchData ? watchData.map(w => w.title).filter(Boolean) : [];
+
         const { data: profile } = await supabase
           .from('profiles')
           .select('username')
@@ -86,16 +96,11 @@ function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; 
         else if (currentHour >= 12 && currentHour < 18) timeContext = "cet après-midi";
         else if (currentHour >= 22 || currentHour < 5) timeContext = "tard dans la nuit";
 
-        const watchedTitles = userWatchlist
-          .filter(w => w.status === 'watched')
-          .map(w => w.title)
-          .filter(Boolean);
-
         const res = await fetch('/api/ai-recommend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            prompt: `Génère un conseil ciné personnalisé et court pour ${pseudo} qui se connecte ${timeContext}. IMPORTANT : Ne recommandes JAMAIS un film ou une série déjà vu(e) par l'utilisateur. Voici la liste exacte des films qu'il a DÉJÀ VUS et qu'il ne faut SURTOUT PAS recommander : ${JSON.stringify(watchedTitles)}. Propose-lui une NOUVEAUTÉ qu'il n'a pas encore vue.`,
+            prompt: `Génère un conseil ciné personnalisé et court pour ${pseudo} qui se connecte ${timeContext}. IMPORTANT : Ne recommandes JAMAIS un film ou une série déjà vu(e) par l'utilisateur. Voici la liste exacte des films qu'il a DÉJÀ VUS (${watchedTitles.length} films) et qu'il ne faut SURTOUT PAS recommander : ${JSON.stringify(watchedTitles)}. Propose-lui une NOUVEAUTÉ qu'il n'a pas encore vue.`,
             mediaType: 'movie' 
           }),
         });
@@ -116,7 +121,7 @@ function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; 
             setSuggestedMovie(tmdbData.results[0]);
           }
         } else {
-          setOracleText(`Salut ${pseudo} ! Marque tes films vus pour que je puisse te proposer de vraies découvertes.`);
+          setOracleText(`Salut ${pseudo} ! Continue d'explorer et de marquer tes films vus pour affiner mes suggestions.`);
         }
       } catch (err) {
         console.error("Erreur Oracle IA:", err);
@@ -126,10 +131,8 @@ function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; 
       }
     };
 
-    if (userId) {
-      generatePersonalizedAdvice();
-    }
-  }, [userId, userWatchlist]);
+    generatePersonalizedAdvice();
+  }, [userId]);
 
   if (loading) {
     return (
@@ -252,7 +255,6 @@ function MediaCardActions({ item, mediaType, onOpen, currentUserId, userWatchlis
             {title}
           </h3>
 
-          {/* BOUTONS D'ACTION RAPIDE (Déjà vu, J'aimerais voir, J'ai pas aimé) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
             <button 
               onClick={(e) => onQuickAction(e, item, 'watched')}
@@ -336,7 +338,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');                
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
-  const [trendingMediaType, setTrendingMediaType] = useState<'movie' | 'tv'>('movie'); // SWIPE TENDANCES DÉDIÉ
+  const [trendingMediaType, setTrendingMediaType] = useState<'movie' | 'tv'>('movie');
   const [trendingMedia, setTrendingMedia] = useState<any[]>([]);
   const [trendingPage, setTrendingPage] = useState<number>(1);
   const [isLoadingMoreTrending, setIsLoadingMoreTrending] = useState(false);
@@ -411,7 +413,6 @@ export default function HomePage() {
     fetchRandomCarousel();
   }, [mediaType]);
 
-  // CHARGEMENT DES TENDANCES BASÉ SUR LE SWIPE/BOUTON DÉDIÉ (trendingMediaType)
   useEffect(() => {
     fetchTrending(1, true, activeMood, trendingMediaType);
   }, [trendingMediaType, activeMood]);
@@ -735,7 +736,6 @@ export default function HomePage() {
     }
   };
 
-  // GESTION DES ACTIONS RAPIDES (Déjà vu, À voir, Disliked -> Alimente user_swipes / watchlist)
   const handleQuickAction = async (e: React.MouseEvent, item: any, actionType: 'watched' | 'to_watch' | 'disliked') => {
     e.stopPropagation();
     e.preventDefault();
@@ -751,7 +751,6 @@ export default function HomePage() {
 
     try {
       if (actionType === 'disliked') {
-        // Enregistre le dislike dans user_swipes pour alimenter l'IA
         await supabase.from('user_swipes').insert([
           {
             user_uid: currentUserId,
@@ -763,7 +762,6 @@ export default function HomePage() {
         ]);
         setFeedback('👎 Préférence enregistrée pour l’IA !');
       } else {
-        // Enregistre dans la watchlist (watched ou to_watch)
         const status = actionType;
         const { data: existing, error: checkError } = await supabase
           .from('watchlist')
@@ -885,7 +883,6 @@ export default function HomePage() {
 
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
 
-  // Filtrage pour ne pas afficher ce qui est déjà dans l'historique ou la watchlist
   const filteredTrendingMedia = trendingMedia.filter((item) => {
     return !userWatchlist.some(w => w.movie_id === item.id.toString());
   });
@@ -956,7 +953,7 @@ export default function HomePage() {
 
         {/* 🔮 ORACLE POTE-CORN (IA SUR-MESURE) */}
         {currentUserId && (
-          <AiOracleCard userId={currentUserId} userWatchlist={userWatchlist} onOpenMovie={openMediaModal} />
+          <AiOracleCard userId={currentUserId} onOpenMovie={openMediaModal} />
         )}
 
         {/* BARRE DE RECHERCHE RAPIDE */}
@@ -1736,19 +1733,16 @@ export default function HomePage() {
         backdropFilter: 'blur(16px)',
         boxShadow: '0 15px 35px rgba(0, 0, 0, 0.8)'
       }}>
-        {/* ACCUEIL */}
         <a href="/" style={{ color: '#9333EA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
           <span style={{ fontSize: '18px' }}>🏠</span>
           <span style={{ fontSize: '9px', marginTop: '2px', fontWeight: 'bold' }}>Accueil</span>
         </a>
 
-        {/* PARTY */}
         <a href="/potecorn-party" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
           <span style={{ fontSize: '18px' }}>🔥</span>
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Party</span>
         </a>
 
-        {/* PROFIL AU CENTRE AVEC LA PHOTO */}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', position: 'relative' }}>
           <a href="/profile" style={{ 
             position: 'absolute', 
@@ -1774,13 +1768,11 @@ export default function HomePage() {
           <span style={{ fontSize: '9px', color: '#A1A1AA', marginTop: '24px', fontWeight: 'bold' }}>Profil</span>
         </div>
 
-        {/* PLAYLISTS */}
         <a href="/playlists" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
           <span style={{ fontSize: '18px' }}>🎵</span>
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Playlists</span>
         </a>
 
-        {/* WATCHLIST */}
         <a href="/watchlist" style={{ color: '#A1A1AA', textDecoration: 'none', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
           <span style={{ fontSize: '18px' }}>📌</span>
           <span style={{ fontSize: '9px', marginTop: '2px' }}>Watchlist</span>
