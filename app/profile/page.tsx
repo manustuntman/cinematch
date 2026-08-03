@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 
@@ -108,7 +109,7 @@ export default function ProfilePage() {
       }
 
       // 2. Watchlist & XP
-      const { data: watchlistData } = await supabase.from('watchlist').select('*');
+      const { data: watchlistData } = await supabase.from('watchlist').select('*').eq('user_uid', userId);
       let watchedCountVal = 0;
       let moviesWatchedVal = 0;
       let tvWatchedVal = 0;
@@ -145,21 +146,18 @@ export default function ProfilePage() {
         const directorCounts: { [key: string]: number } = {};
 
         likedItems.forEach((item: any) => {
-          // Analyse des genres enregistrés lors des swipes
           if (item.genres) {
             item.genres.split(',').forEach((g: string) => {
               const genre = g.trim();
               if (genre) genreCounts[genre] = (genreCounts[genre] || 0) + 1;
             });
           }
-          // Analyse des acteurs si présents
           if (item.cast_crew) {
             item.cast_crew.split(',').forEach((c: string) => {
               const person = c.trim();
               if (person) actorCounts[person] = (actorCounts[person] || 0) + 1;
             });
           }
-          // Analyse des réalisateurs si présents
           if (item.director) {
             item.director.split(',').forEach((d: string) => {
               const dir = d.trim();
@@ -425,6 +423,18 @@ export default function ProfilePage() {
     }
   };
 
+  // Suppression d'un swipe négatif ou positif de l'historique
+  const handleDeleteSwipe = async (swipeId: string) => {
+    try {
+      const { error } = await supabase.from('user_swipes').delete().eq('id', swipeId);
+      if (error) throw error;
+      if (user) fetchUserData(user.id);
+    } catch (err) {
+      console.error("Erreur suppression swipe:", err);
+      alert("Erreur lors de la suppression.");
+    }
+  };
+
   const likedMovies = swipes.filter(s => s.action === 'liked');
   const dislikedMovies = swipes.filter(s => s.action === 'disliked');
 
@@ -480,9 +490,9 @@ export default function ProfilePage() {
             {/* CARTE D'IDENTITÉ DU PROFIL */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(192, 132, 252, 0.3)', borderRadius: '24px', padding: '24px', marginBottom: '24px', position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#27272A', overflow: 'hidden', border: '3px solid #C084FC', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#27272A', overflow: 'hidden', border: '3px solid #C084FC', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                   {avatarUrl ? (
-                    <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <Image src={avatarUrl} alt="Avatar" fill sizes="80px" style={{ objectFit: 'cover' }} />
                   ) : (
                     <span style={{ fontSize: '32px' }}>👤</span>
                   )}
@@ -740,30 +750,53 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* HISTORIQUE DES SWIPES */}
+            {/* HISTORIQUE DES SWIPES (AVEC MODIFICATION / SUPPRESSION DES "J'AI PAS AIMÉ") */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px', padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#EC4899', margin: 0 }}>🔥 Historique PoteCorn Party</h3>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#EC4899', margin: 0 }}>🔥 Historique PoteCorn Party (Modifiable)</h3>
                 <a href="/potecorn-party" style={{ fontSize: '11px', color: '#C084FC', textDecoration: 'none', fontWeight: '600' }}>Relancer →</a>
               </div>
+              
               {swipes.length === 0 ? (
                 <p style={{ fontSize: '12px', color: '#A1A1AA', textAlign: 'center', margin: '20px 0' }}>Aucun film swipé avec ce compte.</p>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px', maxHeight: '400px', overflowY: 'auto' }}>
                   {swipes.map((item) => (
-                    <div key={item.id} style={{ backgroundColor: '#18181B', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
-                      <div style={{ height: '140px', backgroundColor: '#27272A', position: 'relative' }}>
-                        {item.poster_path ? (
-                          <img src={item.poster_path} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#71717A', fontSize: '10px' }}>Pas d'affiche</div>
-                        )}
-                        <span style={{ position: 'absolute', top: '6px', right: '6px', backgroundColor: item.action === 'liked' ? 'rgba(74, 222, 128, 0.9)' : 'rgba(239, 68, 68, 0.9)', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '9px', fontWeight: '900' }}>
-                          {item.action === 'liked' ? '✨' : '❌'}
-                        </span>
+                    <div key={item.id} style={{ backgroundColor: '#18181B', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ height: '150px', backgroundColor: '#27272A', position: 'relative' }}>
+                          {item.poster_path ? (
+                            <Image src={item.poster_path} alt={item.title || 'Film'} fill sizes="130px" style={{ objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#71717A', fontSize: '10px' }}>Pas d'affiche</div>
+                          )}
+                          <span style={{ position: 'absolute', top: '6px', right: '6px', backgroundColor: item.action === 'liked' ? 'rgba(74, 222, 128, 0.9)' : 'rgba(239, 68, 68, 0.9)', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '9px', fontWeight: '900', zIndex: 2 }}>
+                            {item.action === 'liked' ? '✨ Aimé' : '❌ Rejeté'}
+                          </span>
+                        </div>
+                        <div style={{ padding: '8px' }}>
+                          <h4 style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>{item.title}</h4>
+                        </div>
                       </div>
-                      <div style={{ padding: '6px' }}>
-                        <h4 style={{ fontSize: '11px', fontWeight: '700', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
+
+                      <div style={{ padding: '0 8px 8px 8px' }}>
+                        <button
+                          onClick={() => handleDeleteSwipe(item.id)}
+                          title="Supprimer ce choix de l'historique"
+                          style={{
+                            width: '100%',
+                            backgroundColor: item.action === 'disliked' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                            color: item.action === 'disliked' ? '#F87171' : '#A1A1AA',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            padding: '6px 4px',
+                            borderRadius: '8px',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {item.action === 'disliked' ? '♻️ Retirer le rejet' : '🗑️ Supprimer'}
+                        </button>
                       </div>
                     </div>
                   ))}
