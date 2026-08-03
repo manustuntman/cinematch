@@ -38,6 +38,7 @@ const AVERSIONS_LIST = [
   { id: 1566, keyword: '1566', name: '🤡 Clowns' },
   { id: 9799, keyword: '9799,210046', name: '🩸 Sang / Extreme Gore' },
   { id: 2439, keyword: '2439,183205', name: '🐍 Serpents' },
+  { id: 99991, keyword: 'adult,erotic,porn', name: '🔞 Bloquer Contenu Adulte / Érotique' },
 ];
 
 const MOODS_LIST = [
@@ -261,7 +262,7 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist, 
             </span>
           )}
 
-          {/* BOUTON RAPIDE "DÉJÀ VU" SUR L'IMAGE */}
+          {/* BOUTON RAPIDE "DÉJÀ VU" */}
           <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}>
             <button 
               onClick={(e) => onQuickMarkWatched(e, item)}
@@ -410,11 +411,12 @@ export default function HomePage() {
   const fetchRandomCarousel = async () => {
     try {
       const randomPage = Math.floor(Math.random() * 20) + 1;
-      const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&sort_by=popularity.desc&page=${randomPage}`;
+      const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&include_adult=false&sort_by=popularity.desc&page=${randomPage}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
-        const shuffled = data.results.sort(() => 0.5 - Math.random());
+        const filtered = data.results.filter((item: any) => item.title || item.name);
+        const shuffled = filtered.sort(() => 0.5 - Math.random());
         setCarouselMedia(shuffled.slice(0, 12));
       }
     } catch (err) {
@@ -438,15 +440,20 @@ export default function HomePage() {
         }
       }
 
-      const url = `/api/tmdb?endpoint=${endpoint}&language=fr-FR&page=${pageToFetch}${extraParams}`;
+      const url = `/api/tmdb?endpoint=${endpoint}&language=fr-FR&include_adult=false${extraParams}&page=${pageToFetch}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
+        const cleanResults = data.results.filter((item: any) => {
+          const t = item.title || item.name || '';
+          return t.trim().length > 0;
+        });
+
         if (reset) {
-          setTrendingMedia(data.results);
+          setTrendingMedia(cleanResults);
           setTrendingPage(1);
         } else {
-          setTrendingMedia(prev => [...prev, ...data.results]);
+          setTrendingMedia(prev => [...prev, ...cleanResults]);
         }
       }
     } catch (err) {
@@ -498,7 +505,7 @@ export default function HomePage() {
       return;
     }
     try {
-      const url = `/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&query=${encodeURIComponent(query)}&page=1`;
+      const url = `/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&include_adult=false&query=${encodeURIComponent(query)}&page=1`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.results) {
@@ -529,7 +536,7 @@ export default function HomePage() {
       const excludedStr = excludeParam ? `&without_genres=${excludeParam}&without_keywords=${excludeParam}` : '';
       const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
       
-      const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&with_genres=${genreQuery}&sort_by=popularity.desc${excludedStr}${providersQuery}${certificationParam}&page=1`;
+      const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&include_adult=false&with_genres=${genreQuery}&sort_by=popularity.desc${excludedStr}${providersQuery}${certificationParam}&page=1`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -569,12 +576,12 @@ export default function HomePage() {
       const fetchedResults: any[] = [];
 
       for (const rec of aiData.recommendations) {
-        let tmdbRes = await fetch(`/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&query=${encodeURIComponent(rec.title)}&page=1`);
+        let tmdbRes = await fetch(`/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&include_adult=false&query=${encodeURIComponent(rec.title)}&page=1`);
         let tmdbData = await tmdbRes.json();
 
         if (!tmdbData.results || tmdbData.results.length === 0) {
           const simplifiedTitle = rec.title.split(':')[0].split('-')[0].trim();
-          tmdbRes = await fetch(`/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&query=${encodeURIComponent(simplifiedTitle)}&page=1`);
+          tmdbRes = await fetch(`/api/tmdb?endpoint=/search/${mediaType}&language=fr-FR&include_adult=false&query=${encodeURIComponent(simplifiedTitle)}&page=1`);
           tmdbData = await tmdbRes.json();
         }
 
@@ -619,7 +626,7 @@ export default function HomePage() {
       const excludedStr = excludeParam ? `&without_keywords=${excludeParam}&without_genres=${excludeParam}` : '';
       const providersQuery = selectedProviders.length > 0 ? `&with_watch_providers=${selectedProviders.join('|')}&watch_region=FR` : '';
       
-      const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&sort_by=popularity.desc${genreQuery}${excludedStr}${providersQuery}${certificationParam}&page=${Math.floor(Math.random() * 5) + 1}`;
+      const url = `/api/tmdb?endpoint=/discover/${mediaType}&language=fr-FR&include_adult=false&sort_by=popularity.desc${genreQuery}${excludedStr}${providersQuery}${certificationParam}&page=${Math.floor(Math.random() * 5) + 1}`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -720,7 +727,6 @@ export default function HomePage() {
     }
   };
 
-  // FONCTION POUR MARQUER DIRECTEMENT COMME "DÉJÀ VU" DEPUIS LA CARTE
   const handleQuickMarkWatched = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();
     e.preventDefault();
@@ -856,6 +862,11 @@ export default function HomePage() {
   }
 
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
+
+  // FILTRAGE : On retire de l'affichage infini les films déjà présents dans la watchlist/historique utilisateur
+  const filteredTrendingMedia = trendingMedia.filter((item) => {
+    return !userWatchlist.some(w => w.movie_id === item.id.toString());
+  });
 
   return (
     <main style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#000000', color: '#FFFFFF', margin: 0, padding: '0 16px 110px 16px', overflowX: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif', boxSizing: 'border-box' }}>
@@ -1347,8 +1358,9 @@ export default function HomePage() {
                 })}
               </div>
 
+              {/* GRILLE DES TENDANCES (FILTRÉE SANS LES DÉJÀ VUS) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
-                {trendingMedia.map((item, idx) => (
+                {filteredTrendingMedia.map((item, idx) => (
                   <MediaCardXRay key={`${item.id}-${idx}`} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickMarkWatched={handleQuickMarkWatched} />
                 ))}
               </div>
