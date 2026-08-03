@@ -192,10 +192,8 @@ function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (m
   );
 }
 
-function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void; currentUserId: string; userWatchlist: any[] }) {
+function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist, onQuickMarkWatched }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void; currentUserId: string; userWatchlist: any[]; onQuickMarkWatched: (e: React.MouseEvent, item: any) => void }) {
   const [cast, setCast] = useState<any[]>([]);
-  const [playlists, setPlaylists] = useState<any[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
   const title = item.title || item.name;
 
   const watchlistEntry = userWatchlist.find(w => w.movie_id === item.id.toString());
@@ -203,50 +201,20 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist }
 
   useEffect(() => {
     let isMounted = true;
-    const fetchCastAndPlaylists = async () => {
+    const fetchCast = async () => {
       try {
         const res = await fetch(`/api/tmdb?endpoint=/${mediaType}/${item.id}/credits&language=fr-FR`);
         const data = await res.json();
         if (isMounted && data.cast) {
           setCast(data.cast.slice(0, 2));
         }
-
-        if (currentUserId && currentUserId !== '') {
-          const { data: plData } = await supabase.from('playlists').select('*').eq('user_uid', currentUserId);
-          if (isMounted && plData) setPlaylists(plData);
-        }
       } catch (err) {
         console.error(err);
       }
     };
-    fetchCastAndPlaylists();
+    fetchCast();
     return () => { isMounted = false; };
-  }, [item.id, mediaType, currentUserId]);
-
-  const handleAdd = async (e: React.MouseEvent, playlistId: string) => {
-    e.stopPropagation();
-    e.preventDefault();
-
-    try {
-      const targetPl = playlists.find(p => p.id === playlistId);
-      if (!targetPl) return;
-
-      const updatedItems = [...(targetPl.items || []), {
-        id: item.id,
-        title: title,
-        poster_path: item.poster_path,
-        media_type: mediaType
-      }];
-
-      const { error } = await supabase.from('playlists').update({ items: updatedItems }).eq('id', playlistId);
-      if (error) throw error;
-      alert(`Ajouté à la playlist "${targetPl.title}" ! ✨`);
-      setShowDropdown(false);
-    } catch (err) {
-      console.error(err);
-      alert('Erreur lors de l\'ajout à la playlist.');
-    }
-  };
+  }, [item.id, mediaType]);
 
   const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450';
 
@@ -293,33 +261,28 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist }
             </span>
           )}
 
+          {/* BOUTON RAPIDE "DÉJÀ VU" SUR L'IMAGE */}
           <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}>
             <button 
-              onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowDropdown(!showDropdown); }}
-              style={{ backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', color: '#FFF', border: '1px solid rgba(255,255,255,0.3)', padding: '5px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}
+              onClick={(e) => onQuickMarkWatched(e, item)}
+              title="Marquer comme déjà vu"
+              style={{ 
+                backgroundColor: statusBadge === 'watched' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(0,0,0,0.8)', 
+                backdropFilter: 'blur(4px)', 
+                color: '#FFF', 
+                border: '1px solid rgba(255,255,255,0.3)', 
+                padding: '6px 8px', 
+                borderRadius: '10px', 
+                fontSize: '11px', 
+                fontWeight: '800', 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
             >
-              📂 +
+              👁️ {statusBadge === 'watched' ? '' : 'Déjà vu'}
             </button>
-
-            {showDropdown && (
-              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '6px', backgroundColor: '#18181B', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '8px', minWidth: '150px', zIndex: 999, boxShadow: '0 10px 25px rgba(0,0,0,0.8)' }} onClick={(e) => e.stopPropagation()}>
-                <p style={{ fontSize: '9px', fontWeight: '800', color: '#A1A1AA', margin: '0 0 6px 0', textTransform: 'uppercase' }}>Ajouter à :</p>
-                {playlists.length === 0 ? (
-                  <p style={{ fontSize: '10px', color: '#71717A', margin: 0 }}>Aucune playlist</p>
-                ) : (
-                  playlists.map((pl) => (
-                    <div 
-                      key={pl.id} 
-                      onClick={(e) => handleAdd(e, pl.id)}
-                      style={{ padding: '6px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px', background: '#27272A' }}
-                    >
-                      <span>{pl.icon || '🎬'}</span>
-                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pl.title}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -755,6 +718,61 @@ export default function HomePage() {
       setFeedback('📋 Fiche copiée ! Prête à être partagée.');
       setTimeout(() => setFeedback(null), 3000);
     }
+  };
+
+  // FONCTION POUR MARQUER DIRECTEMENT COMME "DÉJÀ VU" DEPUIS LA CARTE
+  const handleQuickMarkWatched = async (e: React.MouseEvent, item: any) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (!currentUserId || currentUserId === '') {
+      setFeedback('⚠️ Connectez-vous ou créez un profil pour sauvegarder !');
+      setTimeout(() => setFeedback(null), 3000);
+      return;
+    }
+
+    const title = item.title || item.name;
+    const movieIdStr = item.id.toString();
+
+    try {
+      const { data: existing, error: checkError } = await supabase
+        .from('watchlist')
+        .select('id, status')
+        .eq('movie_id', movieIdStr)
+        .eq('user_uid', currentUserId);
+
+      if (checkError) throw checkError;
+
+      if (existing && existing.length > 0) {
+        const newStatus = existing[0].status === 'watched' ? 'to_watch' : 'watched';
+        await supabase.from('watchlist').update({ status: newStatus }).eq('movie_id', movieIdStr).eq('user_uid', currentUserId);
+        setFeedback(newStatus === 'watched' ? '👁️ Marqué comme vu !' : '📌 Remis dans la watchlist');
+      } else {
+        const { error } = await supabase.from('watchlist').insert([
+          {
+            user_uid: currentUserId,
+            movie_id: movieIdStr,
+            title: title,
+            poster_path: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+            vote_average: parseFloat(item.vote_average || 0),
+            status: 'watched',
+            user_notes: '',
+            user_rating: 0,
+            user_tags: [],
+            media_type: mediaType
+          },
+        ]);
+        if (error) throw error;
+        setFeedback('👁️ Marqué comme vu ! ✨');
+      }
+
+      const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_uid', currentUserId);
+      if (watchData) setUserWatchlist(watchData);
+    } catch (err) {
+      console.error(err);
+      setFeedback('⚠️ Erreur lors de la mise à jour');
+    }
+    setTimeout(() => setFeedback(null), 3000);
   };
 
   const saveToSupabaseWithNotebook = async (status: 'to_watch' | 'watched') => {
@@ -1331,7 +1349,7 @@ export default function HomePage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {trendingMedia.map((item, idx) => (
-                  <MediaCardXRay key={`${item.id}-${idx}`} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} />
+                  <MediaCardXRay key={`${item.id}-${idx}`} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickMarkWatched={handleQuickMarkWatched} />
                 ))}
               </div>
 
@@ -1366,7 +1384,7 @@ export default function HomePage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {recommendedMedia.map((item) => (
-                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} />
+                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickMarkWatched={handleQuickMarkWatched} />
                 ))}
               </div>
             )}
