@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Image from 'next/image';
 
-export default function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (movie: any) => void }) {
+export default function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; userWatchlist: any[]; onOpenMovie: (movie: any) => void }) {
   const [oracleText, setOracleText] = useState<string>('Analyse de ton profil cinéphile en cours...');
   const [suggestedMovie, setSuggestedMovie] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -12,15 +12,7 @@ export default function AiOracleCard({ userId, onOpenMovie }: { userId: string; 
   useEffect(() => {
     const generatePersonalizedAdvice = async () => {
       try {
-        // 1. Récupérer les likes de l'utilisateur pour comprendre ses goûts
-        const { data: swipes } = await supabase
-          .from('user_swipes')
-          .select('*')
-          .eq('user_uid', userId)
-          .eq('action', 'liked')
-          .limit(10);
-
-        // 2. Récupérer le profil pour avoir son pseudo
+        // 1. Récupérer le profil pour avoir son pseudo
         const { data: profile } = await supabase
           .from('profiles')
           .select('username')
@@ -36,12 +28,18 @@ export default function AiOracleCard({ userId, onOpenMovie }: { userId: string; 
         else if (currentHour >= 12 && currentHour < 18) timeContext = "cet après-midi";
         else if (currentHour >= 22 || currentHour < 5) timeContext = "tard dans la nuit";
 
-        // 3. Appel de l'API IA (Ton endpoint /api/ai-recommend ou similaire)
+        // Récupérer la liste des titres déjà vus pour les interdire formellement à l'IA
+        const watchedTitles = userWatchlist
+          .filter(w => w.status === 'watched')
+          .map(w => w.title)
+          .filter(Boolean);
+
+        // 2. Appel de l'API IA avec la liste des films déjà vus interdits
         const res = await fetch('/api/ai-recommend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            prompt: `Génère un conseil ciné personnalisé et court pour ${pseudo} qui se connecte ${timeContext}. Il aime ces films/genres: ${JSON.stringify(swipes?.map(s => s.title))}. Donne-lui l'impression que tu le connais par cœur.`,
+            prompt: `Génère un conseil ciné personnalisé et court pour ${pseudo} qui se connecte ${timeContext}. IMPORTANT : Ne recommandes JAMAIS un film ou une série déjà vu(e) par l'utilisateur. Voici la liste exacte des films qu'il a DÉJÀ VUS et qu'il ne faut SURTOUT PAS recommander : ${JSON.stringify(watchedTitles)}. Propose-lui une NOUVEAUTÉ qu'il n'a pas encore vue.`,
             mediaType: 'movie' 
           }),
         });
@@ -49,21 +47,26 @@ export default function AiOracleCard({ userId, onOpenMovie }: { userId: string; 
         const data = await res.json();
         
         if (data && data.recommendations && data.recommendations.length > 0) {
-          const rec = data.recommendations[0];
+          // Filtrage de sécurité au cas où l'IA passe outre la consigne
+          const validRecs = data.recommendations.filter((rec: any) => 
+            !watchedTitles.some(watched => watched?.toLowerCase() === rec.title?.toLowerCase())
+          );
+
+          const rec = validRecs.length > 0 ? validRecs[0] : data.recommendations[0];
           setOracleText(rec.reason);
 
-          // Chercher le film sur TMDB pour récupérer l'affiche
-          const tmdbRes = await fetch(`/api/tmdb?endpoint=/search/movie&language=fr-FR&query=${encodeURIComponent(rec.title)}&page=1`);
+          // Chercher le film sur TMDB pour récupérer l'affiche (avec exclusion du contenu adulte)
+          const tmdbRes = await fetch(`/api/tmdb?endpoint=/search/movie&language=fr-FR&include_adult=false&query=${encodeURIComponent(rec.title)}&page=1`);
           const tmdbData = await tmdbRes.json();
           if (tmdbData.results && tmdbData.results.length > 0) {
             setSuggestedMovie(tmdbData.results[0]);
           }
         } else {
-          setOracleText(`Salut ${pseudo} ! Swipe quelques films pour que je puisse cerner tes goûts et te concocter des recommandations sur-mesure.`);
+          setOracleText(`Salut ${pseudo} ! Marque tes films vus pour que je puisse te proposer de vraies découvertes.`);
         }
       } catch (err) {
         console.error("Erreur Oracle IA:", err);
-        setOracleText("L'Oracle se repose... Continue de swiper pour alimenter ton profil !");
+        setOracleText("L'Oracle se repose... Continue d'explorer pour alimenter ton profil !");
       } finally {
         setLoading(false);
       }
@@ -72,7 +75,7 @@ export default function AiOracleCard({ userId, onOpenMovie }: { userId: string; 
     if (userId) {
       generatePersonalizedAdvice();
     }
-  }, [userId]);
+  }, [userId, userWatchlist]);
 
   if (loading) {
     return (
@@ -99,7 +102,7 @@ export default function AiOracleCard({ userId, onOpenMovie }: { userId: string; 
       </div>
 
       <p style={{ fontSize: '13px', color: '#FFF', lineHeight: '1.5', margin: '0 0 16px 0', fontStyle: 'italic' }}>
-        "{oracleText}"
+        &quot;{oracleText}&quot;
       </p>
 
       {suggestedMovie && (
@@ -126,7 +129,7 @@ export default function AiOracleCard({ userId, onOpenMovie }: { userId: string; 
             />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: '9px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase' }}>Coup de cœur du moment :</span>
+            <span style={{ fontSize: '9px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase' }}>Découverte suggérée :</span>
             <h4 style={{ fontSize: '13px', fontWeight: '800', margin: '2px 0 2px 0', color: '#FFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {suggestedMovie.title}
             </h4>
