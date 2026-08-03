@@ -59,7 +59,6 @@ export default function ProfilePage() {
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
 
   useEffect(() => {
-    // Casse le cache de Next.js pour forcer la page à chercher les dernières infos
     router.refresh();
 
     const checkUser = async () => {
@@ -128,7 +127,7 @@ export default function ProfilePage() {
         calculatedXP = xpFromWatched + xpFromToWatch;
       }
 
-      // 3. Swipes & Panthéon
+      // 3. Swipes & Panthéon Dynamique
       const { data: swipesData } = await supabase
         .from('user_swipes')
         .select('*')
@@ -146,18 +145,21 @@ export default function ProfilePage() {
         const directorCounts: { [key: string]: number } = {};
 
         likedItems.forEach((item: any) => {
+          // Analyse des genres enregistrés lors des swipes
           if (item.genres) {
             item.genres.split(',').forEach((g: string) => {
               const genre = g.trim();
               if (genre) genreCounts[genre] = (genreCounts[genre] || 0) + 1;
             });
           }
+          // Analyse des acteurs si présents
           if (item.cast_crew) {
             item.cast_crew.split(',').forEach((c: string) => {
               const person = c.trim();
               if (person) actorCounts[person] = (actorCounts[person] || 0) + 1;
             });
           }
+          // Analyse des réalisateurs si présents
           if (item.director) {
             item.director.split(',').forEach((d: string) => {
               const dir = d.trim();
@@ -170,11 +172,10 @@ export default function ProfilePage() {
         const sortedActors = Object.keys(actorCounts).sort((a, b) => actorCounts[b] - actorCounts[a]).slice(0, 3);
         const sortedDirectors = Object.keys(directorCounts).sort((a, b) => directorCounts[b] - directorCounts[a]).slice(0, 3);
 
-        // Remplacement des fausses données écrites en dur par de vraies analyses
         setPantheon({
-          topGenres: sortedGenres.length > 0 ? sortedGenres : ['Données insuffisantes'],
-          topDirectors: sortedDirectors.length > 0 ? sortedDirectors : ['Données insuffisantes'],
-          topActors: sortedActors.length > 0 ? sortedActors : ['Données insuffisantes'],
+          topGenres: sortedGenres.length > 0 ? sortedGenres : ['Continue de swiper !'],
+          topDirectors: sortedDirectors.length > 0 ? sortedDirectors : ['Bientôt disponible'],
+          topActors: sortedActors.length > 0 ? sortedActors : ['Bientôt disponible'],
         });
       }
 
@@ -192,7 +193,7 @@ export default function ProfilePage() {
         xpProgress: progressPercentage,
       });
 
-      // 4. Succès Secrets (Vérification et déblocage automatique)
+      // 4. Succès Secrets (RPG)
       const currentHour = new Date().getHours();
       const hasSwipes = Boolean(swipesData && swipesData.length > 0);
       const likedCount = swipesData ? swipesData.filter((s: any) => s.action === 'liked').length : 0;
@@ -219,7 +220,7 @@ export default function ProfilePage() {
       }
       setUnlockedAchievements(unlockedKeys);
 
-      // 5. Amis (Acceptés) & Compatibilité
+      // 5. Amis & Compatibilité
       const { data: friendshipsData } = await supabase
         .from('friendships')
         .select('*')
@@ -322,7 +323,7 @@ export default function ProfilePage() {
     reader.onloadend = () => {
       setAvatarUrl(reader.result as string);
       setUploadingImage(false);
-    }
+    };
     reader.onerror = () => {
       alert("Erreur lors de la lecture de l'image.");
       setUploadingImage(false);
