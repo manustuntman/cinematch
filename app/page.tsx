@@ -760,6 +760,8 @@ export default function HomePage() {
             media_type: trendingMediaType
           }
         ]);
+        // Ajout instantané dans userWatchlist local sous un statut fictif ou masquage direct
+        setUserWatchlist(prev => [...prev, { movie_id: movieIdStr, status: 'disliked' }]);
         setFeedback('👎 Préférence enregistrée pour l’IA !');
       } else {
         const status = actionType;
@@ -789,11 +791,15 @@ export default function HomePage() {
             },
           ]);
         }
+        
+        // Met à jour instantanément la liste locale pour masquer la carte des suggestions/tendances
+        setUserWatchlist(prev => {
+          const filtered = prev.filter(w => w.movie_id !== movieIdStr);
+          return [...filtered, { movie_id: movieIdStr, status }];
+        });
+
         setFeedback(status === 'watched' ? '👁️ Marqué comme déjà vu !' : '📌 Ajouté à "À voir" !');
       }
-
-      const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_uid', currentUserId);
-      if (watchData) setUserWatchlist(watchData);
     } catch (err) {
       console.error(err);
       setFeedback('⚠️ Erreur lors de la mise à jour');
@@ -842,8 +848,10 @@ export default function HomePage() {
         if (error) throw error;
       }
 
-      const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_uid', currentUserId);
-      if (watchData) setUserWatchlist(watchData);
+      setUserWatchlist(prev => {
+        const filtered = prev.filter(w => w.movie_id !== movieIdStr);
+        return [...filtered, { movie_id: movieIdStr, status }];
+      });
 
       setFeedback(status === 'to_watch' ? '📌 Ajouté à la Watchlist !' : '👁️ Marqué comme vu !');
       setSelectedMediaDetail(null);
@@ -884,6 +892,10 @@ export default function HomePage() {
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
 
   const filteredTrendingMedia = trendingMedia.filter((item) => {
+    return !userWatchlist.some(w => w.movie_id === item.id.toString());
+  });
+
+  const filteredRecommendedMedia = recommendedMedia.filter((item) => {
     return !userWatchlist.some(w => w.movie_id === item.id.toString());
   });
 
@@ -1415,7 +1427,7 @@ export default function HomePage() {
                 })}
               </div>
 
-              {/* GRILLE DES TENDANCES (FILTRÉE SANS LES DÉJÀ VUS) */}
+              {/* GRILLE DES TENDANCES (FILTRÉE SANS LES DÉJÀ VUS / DISLIKÉS) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {filteredTrendingMedia.map((item, idx) => (
                   <MediaCardActions key={`${item.id}-${idx}`} item={item} mediaType={trendingMediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickAction={handleQuickAction} />
@@ -1452,7 +1464,7 @@ export default function HomePage() {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
-                {recommendedMedia.map((item) => (
+                {filteredRecommendedMedia.map((item) => (
                   <MediaCardActions key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickAction={handleQuickAction} />
                 ))}
               </div>
