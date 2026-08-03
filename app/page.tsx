@@ -108,7 +108,7 @@ function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (m
           const rec = data.recommendations[0];
           setOracleText(rec.reason);
 
-          const tmdbRes = await fetch(`/api/tmdb?endpoint=/search/movie&language=fr-FR&query=${encodeURIComponent(rec.title)}&page=1`);
+          const tmdbRes = await fetch(`/api/tmdb?endpoint=/search/movie&language=fr-FR&include_adult=false&query=${encodeURIComponent(rec.title)}&page=1`);
           const tmdbData = await tmdbRes.json();
           if (tmdbData.results && tmdbData.results.length > 0) {
             setSuggestedMovie(tmdbData.results[0]);
@@ -333,6 +333,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');                
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
+  const [trendingMediaType, setTrendingMediaType] = useState<'movie' | 'tv'>('movie'); // SWIPE TENDANCES DÉDIÉ
   const [trendingMedia, setTrendingMedia] = useState<any[]>([]);
   const [trendingPage, setTrendingPage] = useState<number>(1);
   const [isLoadingMoreTrending, setIsLoadingMoreTrending] = useState(false);
@@ -404,9 +405,13 @@ export default function HomePage() {
     };
 
     initUserAndData();
-    fetchTrending(1, true, 'all');
     fetchRandomCarousel();
   }, [mediaType]);
+
+  // CHARGEMENT DES TENDANCES BASÉ SUR LE SWIPE/BOUTON DÉDIÉ (trendingMediaType)
+  useEffect(() => {
+    fetchTrending(1, true, activeMood, trendingMediaType);
+  }, [trendingMediaType, activeMood]);
 
   const fetchRandomCarousel = async () => {
     try {
@@ -424,18 +429,18 @@ export default function HomePage() {
     }
   };
 
-  const fetchTrending = async (pageToFetch = 1, reset = false, mood = activeMood) => {
+  const fetchTrending = async (pageToFetch = 1, reset = false, mood = activeMood, tType = trendingMediaType) => {
     if (isLoadingMoreTrending) return;
     if (!reset) setIsLoadingMoreTrending(true);
 
     try {
-      let endpoint = `/trending/${mediaType}/week`;
+      let endpoint = `/trending/${tType}/week`;
       let extraParams = '';
 
       if (mood !== 'all') {
         const selectedMoodObj = MOODS_LIST.find(m => m.id === mood);
         if (selectedMoodObj && selectedMoodObj.genreId) {
-          endpoint = `/discover/${mediaType}`;
+          endpoint = `/discover/${tType}`;
           extraParams = `&with_genres=${selectedMoodObj.genreId}&sort_by=popularity.desc`;
         }
       }
@@ -464,7 +469,7 @@ export default function HomePage() {
 
   const handleMoodChange = (moodId: string) => {
     setActiveMood(moodId);
-    fetchTrending(1, true, moodId);
+    fetchTrending(1, true, moodId, trendingMediaType);
   };
 
   useEffect(() => {
@@ -476,13 +481,13 @@ export default function HomePage() {
       if (scrollPosition >= threshold && !isLoadingMoreTrending) {
         const nextPage = trendingPage + 1;
         setTrendingPage(nextPage);
-        fetchTrending(nextPage, false, activeMood);
+        fetchTrending(nextPage, false, activeMood, trendingMediaType);
       }
     };
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [trendingPage, isLoadingMoreTrending, isSetupComplete, activeMood]);
+  }, [trendingPage, isLoadingMoreTrending, isSetupComplete, activeMood, trendingMediaType]);
 
   const fetchUserPlaylists = async () => {
     if (!currentUserId || currentUserId === '') return;
@@ -647,13 +652,13 @@ export default function HomePage() {
   const fetchExtraDetails = async (id: string | number) => {
     setLoadingExt(true);
     try {
-      const detailRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}&language=fr-FR`);
+      const detailRes = await fetch(`/api/tmdb?endpoint=/${trendingMediaType}/${id}&language=fr-FR`);
       const detailData = await detailRes.json();
 
-      const creditsRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}/credits&language=fr-FR`);
+      const creditsRes = await fetch(`/api/tmdb?endpoint=/${trendingMediaType}/${id}/credits&language=fr-FR`);
       const creditsData = await creditsRes.json();
       
-      const directorObj = mediaType === 'movie' 
+      const directorObj = trendingMediaType === 'movie' 
         ? creditsData.crew?.find((member: any) => member.job === 'Director')
         : detailData.created_by?.[0];
 
@@ -664,21 +669,21 @@ export default function HomePage() {
         profile_path: c.profile_path
       })) : [];
 
-      const providersRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}/watch/providers`);
+      const providersRes = await fetch(`/api/tmdb?endpoint=/${trendingMediaType}/${id}/watch/providers`);
       const providersData = await providersRes.json();
       const frProviders = providersData.results?.FR || {};
 
-      let videoRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}/videos&language=fr-FR`);
+      let videoRes = await fetch(`/api/tmdb?endpoint=/${trendingMediaType}/${id}/videos&language=fr-FR`);
       let videoData = await videoRes.json();
       let trailer = videoData.results?.find((v: any) => (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube');
       
       if (!trailer) {
-        videoRes = await fetch(`/api/tmdb?endpoint=/${mediaType}/${id}/videos&language=en-US`);
+        videoRes = await fetch(`/api/tmdb?endpoint=/${trendingMediaType}/${id}/videos&language=en-US`);
         videoData = await videoRes.json();
         trailer = videoData.results?.find((v: any) => (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube');
       }
 
-      const runtimeStr = mediaType === 'movie' 
+      const runtimeStr = trendingMediaType === 'movie' 
         ? detailData.runtime ? `${Math.floor(detailData.runtime / 60)}h ${detailData.runtime % 60}m` : 'N/A'
         : detailData.number_of_seasons ? `${detailData.number_of_seasons} saison(s)` : 'N/A';
 
@@ -765,7 +770,7 @@ export default function HomePage() {
             user_notes: '',
             user_rating: 0,
             user_tags: [],
-            media_type: mediaType
+            media_type: trendingMediaType
           },
         ]);
         if (error) throw error;
@@ -816,7 +821,7 @@ export default function HomePage() {
             user_notes: userNotes,
             user_rating: userRating,
             user_tags: selectedTags,
-            media_type: mediaType
+            media_type: trendingMediaType
           },
         ]);
         if (error) throw error;
@@ -843,7 +848,7 @@ export default function HomePage() {
         id: selectedMediaDetail.id,
         title: selectedMediaDetail.title || selectedMediaDetail.name,
         poster_path: selectedMediaDetail.poster_path,
-        media_type: mediaType
+        media_type: trendingMediaType
       }];
 
       const { error } = await supabase.from('playlists').update({ items: updatedItems }).eq('id', selectedPlaylistId);
@@ -863,7 +868,7 @@ export default function HomePage() {
 
   const currentGenresList = mediaType === 'movie' ? GENRES_LIST_MOVIES : GENRES_LIST_TV;
 
-  // FILTRAGE : On retire de l'affichage infini les films déjà présents dans la watchlist/historique utilisateur
+  // Filtrage pour ne pas afficher ce qui est déjà dans l'historique ou la watchlist
   const filteredTrendingMedia = trendingMedia.filter((item) => {
     return !userWatchlist.some(w => w.movie_id === item.id.toString());
   });
@@ -1323,12 +1328,50 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* SECTION TENDANCES & FILTRES RAPIDES PAR MOOD */}
+            {/* SECTION TENDANCES & SYSTÈME DE BASCULE/SWIPE FILMS / SÉRIES */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>
                   🔥 Tendances & Moods
                 </h2>
+              </div>
+
+              {/* BASCULE RAPIDE (SWIPE/BOUTON) FILMS / SÉRIES */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px', backgroundColor: 'rgba(24, 24, 27, 0.9)', padding: '6px', borderRadius: '18px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                <button
+                  onClick={() => setTrendingMediaType('movie')}
+                  style={{
+                    backgroundColor: trendingMediaType === 'movie' ? '#9333EA' : 'transparent',
+                    border: 'none',
+                    color: '#FFF',
+                    padding: '10px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s ease',
+                    boxShadow: trendingMediaType === 'movie' ? '0 4px 12px rgba(147, 51, 234, 0.4)' : 'none'
+                  }}
+                >
+                  🎬 Films Tendance
+                </button>
+                <button
+                  onClick={() => setTrendingMediaType('tv')}
+                  style={{
+                    backgroundColor: trendingMediaType === 'tv' ? '#9333EA' : 'transparent',
+                    border: 'none',
+                    color: '#FFF',
+                    padding: '10px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s ease',
+                    boxShadow: trendingMediaType === 'tv' ? '0 4px 12px rgba(147, 51, 234, 0.4)' : 'none'
+                  }}
+                >
+                  📺 Séries Tendances
+                </button>
               </div>
 
               {/* FILTRES RAPIDES PAR MOOD */}
@@ -1361,13 +1404,13 @@ export default function HomePage() {
               {/* GRILLE DES TENDANCES (FILTRÉE SANS LES DÉJÀ VUS) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {filteredTrendingMedia.map((item, idx) => (
-                  <MediaCardXRay key={`${item.id}-${idx}`} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickMarkWatched={handleQuickMarkWatched} />
+                  <MediaCardXRay key={`${item.id}-${idx}`} item={item} mediaType={trendingMediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickMarkWatched={handleQuickMarkWatched} />
                 ))}
               </div>
 
               {isLoadingMoreTrending && (
                 <div style={{ textAlign: 'center', padding: '20px 0', color: '#C084FC', fontSize: '12px', fontWeight: 'bold' }}>
-                  ⚡ Chargement de plus de films...
+                  ⚡ Chargement de plus de contenus...
                 </div>
               )}
             </div>
@@ -1418,7 +1461,7 @@ export default function HomePage() {
                     color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
                   }}
                 >
-                  🎬 Fiche {mediaType === 'movie' ? 'Film' : 'Série'}
+                  🎬 Fiche {trendingMediaType === 'movie' ? 'Film' : 'Série'}
                 </button>
                 <button
                   onClick={() => setActiveTab('xray')}
