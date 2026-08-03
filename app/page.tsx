@@ -86,7 +86,6 @@ function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; 
         else if (currentHour >= 12 && currentHour < 18) timeContext = "cet après-midi";
         else if (currentHour >= 22 || currentHour < 5) timeContext = "tard dans la nuit";
 
-        // Récupérer la liste des titres déjà vus pour les interdire formellement à l'IA
         const watchedTitles = userWatchlist
           .filter(w => w.status === 'watched')
           .map(w => w.title)
@@ -104,7 +103,6 @@ function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; 
         const data = await res.json();
         
         if (data && data.recommendations && data.recommendations.length > 0) {
-          // Filtrage de sécurité additionnel côté client
           const validRecs = data.recommendations.filter((rec: any) => 
             !watchedTitles.some(watched => watched?.toLowerCase() === rec.title?.toLowerCase())
           );
@@ -122,7 +120,7 @@ function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; 
         }
       } catch (err) {
         console.error("Erreur Oracle IA:", err);
-        setOracleText("L'Oracle se repose... Continue de swiper pour alimenter ton profil !");
+        setOracleText("L'Oracle se repose... Continue d'explorer pour alimenter ton profil !");
       } finally {
         setLoading(false);
       }
@@ -197,29 +195,11 @@ function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; 
   );
 }
 
-function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist, onQuickMarkWatched }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void; currentUserId: string; userWatchlist: any[]; onQuickMarkWatched: (e: React.MouseEvent, item: any) => void }) {
-  const [cast, setCast] = useState<any[]>([]);
+function MediaCardActions({ item, mediaType, onOpen, currentUserId, userWatchlist, onQuickAction }: { item: any; mediaType: 'movie' | 'tv'; onOpen: (item: any) => void; currentUserId: string; userWatchlist: any[]; onQuickAction: (e: React.MouseEvent, item: any, actionType: 'watched' | 'to_watch' | 'disliked') => void }) {
   const title = item.title || item.name;
 
   const watchlistEntry = userWatchlist.find(w => w.movie_id === item.id.toString());
   const statusBadge = watchlistEntry ? watchlistEntry.status : null;
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchCast = async () => {
-      try {
-        const res = await fetch(`/api/tmdb?endpoint=/${mediaType}/${item.id}/credits&language=fr-FR`);
-        const data = await res.json();
-        if (isMounted && data.cast) {
-          setCast(data.cast.slice(0, 2));
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchCast();
-    return () => { isMounted = false; };
-  }, [item.id, mediaType]);
 
   const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450';
 
@@ -243,7 +223,7 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist, 
       onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
     >
       <div>
-        <div style={{ position: 'relative', width: '100%', height: '200px' }}>
+        <div style={{ position: 'relative', width: '100%', height: '220px' }}>
           <Image 
             src={posterUrl} 
             alt={title} 
@@ -256,59 +236,78 @@ function MediaCardXRay({ item, mediaType, onOpen, currentUserId, userWatchlist, 
           </span>
 
           {statusBadge === 'watched' && (
-            <span style={{ position: 'absolute', bottom: '8px', left: '8px', zIndex: 5, backgroundColor: 'rgba(16, 185, 129, 0.9)', color: '#FFF', fontSize: '9px', fontWeight: '800', padding: '3px 6px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>
+            <span style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 5, backgroundColor: 'rgba(16, 185, 129, 0.9)', color: '#FFF', fontSize: '9px', fontWeight: '800', padding: '3px 6px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>
               👁️ Déjà vu
             </span>
           )}
           {statusBadge === 'to_watch' && (
-            <span style={{ position: 'absolute', bottom: '8px', left: '8px', zIndex: 5, backgroundColor: 'rgba(147, 51, 234, 0.9)', color: '#FFF', fontSize: '9px', fontWeight: '800', padding: '3px 6px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>
-              📌 Watchlist
+            <span style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 5, backgroundColor: 'rgba(147, 51, 234, 0.9)', color: '#FFF', fontSize: '9px', fontWeight: '800', padding: '3px 6px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>
+              📌 À voir
             </span>
           )}
-
-          {/* BOUTON RAPIDE "DÉJÀ VU" */}
-          <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}>
-            <button 
-              onClick={(e) => onQuickMarkWatched(e, item)}
-              title="Marquer comme déjà vu"
-              style={{ 
-                backgroundColor: statusBadge === 'watched' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(0,0,0,0.8)', 
-                backdropFilter: 'blur(4px)', 
-                color: '#FFF', 
-                border: '1px solid rgba(255,255,255,0.3)', 
-                padding: '6px 8px', 
-                borderRadius: '10px', 
-                fontSize: '11px', 
-                fontWeight: '800', 
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              👁️ {statusBadge === 'watched' ? '' : 'Déjà vu'}
-            </button>
-          </div>
         </div>
 
         <div style={{ padding: '12px' }}>
-          <h3 style={{ fontSize: '13px', fontWeight: '800', margin: '0 0 8px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: '800', margin: '0 0 10px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFF' }}>
             {title}
           </h3>
 
-          <div style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)', borderRadius: '12px', padding: '8px' }}>
-            <span style={{ fontSize: '9px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-              ⚡ X-Ray Casting :
-            </span>
-            {cast.length > 0 ? (
-              cast.map((actor, idx) => (
-                <div key={idx} style={{ fontSize: '10px', color: '#D4D4D8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '2px' }}>
-                  <strong style={{ color: '#FFF' }}>{actor.name}</strong> <span style={{ color: '#A1A1AA' }}>({actor.character || 'Rôle'})</span>
-                </div>
-              ))
-            ) : (
-              <span style={{ fontSize: '10px', color: '#71717A' }}>Chargement X-Ray...</span>
-            )}
+          {/* BOUTONS D'ACTION RAPIDE (Déjà vu, J'aimerais voir, J'ai pas aimé) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+            <button 
+              onClick={(e) => onQuickAction(e, item, 'watched')}
+              title="Marquer comme déjà vu"
+              style={{ 
+                backgroundColor: statusBadge === 'watched' ? '#10B981' : 'rgba(255,255,255,0.06)', 
+                color: '#FFF', 
+                border: '1px solid rgba(255,255,255,0.12)', 
+                padding: '6px 4px', 
+                borderRadius: '10px', 
+                fontSize: '10px', 
+                fontWeight: '700', 
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              👁️ Déjà vu
+            </button>
+
+            <button 
+              onClick={(e) => onQuickAction(e, item, 'to_watch')}
+              title="J'aimerais voir"
+              style={{ 
+                backgroundColor: statusBadge === 'to_watch' ? '#9333EA' : 'rgba(255,255,255,0.06)', 
+                color: '#FFF', 
+                border: '1px solid rgba(255,255,255,0.12)', 
+                padding: '6px 4px', 
+                borderRadius: '10px', 
+                fontSize: '10px', 
+                fontWeight: '700', 
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              📌 À voir
+            </button>
+
+            <button 
+              onClick={(e) => onQuickAction(e, item, 'disliked')}
+              title="Je n'aime pas"
+              style={{ 
+                gridColumn: 'span 2',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)', 
+                color: '#F87171', 
+                border: '1px solid rgba(239, 68, 68, 0.3)', 
+                padding: '5px 4px', 
+                borderRadius: '10px', 
+                fontSize: '10px', 
+                fontWeight: '700', 
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              👎 J'ai pas aimé
+            </button>
           </div>
         </div>
       </div>
@@ -736,7 +735,8 @@ export default function HomePage() {
     }
   };
 
-  const handleQuickMarkWatched = async (e: React.MouseEvent, item: any) => {
+  // GESTION DES ACTIONS RAPIDES (Déjà vu, À voir, Disliked -> Alimente user_swipes / watchlist)
+  const handleQuickAction = async (e: React.MouseEvent, item: any, actionType: 'watched' | 'to_watch' | 'disliked') => {
     e.stopPropagation();
     e.preventDefault();
 
@@ -750,35 +750,48 @@ export default function HomePage() {
     const movieIdStr = item.id.toString();
 
     try {
-      const { data: existing, error: checkError } = await supabase
-        .from('watchlist')
-        .select('id, status')
-        .eq('movie_id', movieIdStr)
-        .eq('user_uid', currentUserId);
-
-      if (checkError) throw checkError;
-
-      if (existing && existing.length > 0) {
-        const newStatus = existing[0].status === 'watched' ? 'to_watch' : 'watched';
-        await supabase.from('watchlist').update({ status: newStatus }).eq('movie_id', movieIdStr).eq('user_uid', currentUserId);
-        setFeedback(newStatus === 'watched' ? '👁️ Marqué comme vu !' : '📌 Remis dans la watchlist');
-      } else {
-        const { error } = await supabase.from('watchlist').insert([
+      if (actionType === 'disliked') {
+        // Enregistre le dislike dans user_swipes pour alimenter l'IA
+        await supabase.from('user_swipes').insert([
           {
             user_uid: currentUserId,
             movie_id: movieIdStr,
             title: title,
-            poster_path: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
-            vote_average: parseFloat(item.vote_average || 0),
-            status: 'watched',
-            user_notes: '',
-            user_rating: 0,
-            user_tags: [],
+            action: 'disliked',
             media_type: trendingMediaType
-          },
+          }
         ]);
-        if (error) throw error;
-        setFeedback('👁️ Marqué comme vu ! ✨');
+        setFeedback('👎 Préférence enregistrée pour l’IA !');
+      } else {
+        // Enregistre dans la watchlist (watched ou to_watch)
+        const status = actionType;
+        const { data: existing, error: checkError } = await supabase
+          .from('watchlist')
+          .select('id')
+          .eq('movie_id', movieIdStr)
+          .eq('user_uid', currentUserId);
+
+        if (checkError) throw checkError;
+
+        if (existing && existing.length > 0) {
+          await supabase.from('watchlist').update({ status }).eq('movie_id', movieIdStr).eq('user_uid', currentUserId);
+        } else {
+          await supabase.from('watchlist').insert([
+            {
+              user_uid: currentUserId,
+              movie_id: movieIdStr,
+              title: title,
+              poster_path: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+              vote_average: parseFloat(item.vote_average || 0),
+              status: status,
+              user_notes: '',
+              user_rating: 0,
+              user_tags: [],
+              media_type: trendingMediaType
+            },
+          ]);
+        }
+        setFeedback(status === 'watched' ? '👁️ Marqué comme déjà vu !' : '📌 Ajouté à "À voir" !');
       }
 
       const { data: watchData } = await supabase.from('watchlist').select('movie_id, status').eq('user_uid', currentUserId);
@@ -1408,7 +1421,7 @@ export default function HomePage() {
               {/* GRILLE DES TENDANCES (FILTRÉE SANS LES DÉJÀ VUS) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {filteredTrendingMedia.map((item, idx) => (
-                  <MediaCardXRay key={`${item.id}-${idx}`} item={item} mediaType={trendingMediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickMarkWatched={handleQuickMarkWatched} />
+                  <MediaCardActions key={`${item.id}-${idx}`} item={item} mediaType={trendingMediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickAction={handleQuickAction} />
                 ))}
               </div>
 
@@ -1443,7 +1456,7 @@ export default function HomePage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
                 {recommendedMedia.map((item) => (
-                  <MediaCardXRay key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickMarkWatched={handleQuickMarkWatched} />
+                  <MediaCardActions key={item.id} item={item} mediaType={mediaType} onOpen={openMediaModal} currentUserId={currentUserId} userWatchlist={userWatchlist} onQuickAction={handleQuickAction} />
                 ))}
               </div>
             )}
