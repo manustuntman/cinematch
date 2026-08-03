@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { useRouter } from 'next/navigation';
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
 
@@ -57,6 +59,9 @@ export default function ProfilePage() {
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
 
   useEffect(() => {
+    // Casse le cache de Next.js pour forcer la page à chercher les dernières infos
+    router.refresh();
+
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -81,7 +86,7 @@ export default function ProfilePage() {
     };
 
     checkUser();
-  }, []);
+  }, [router]);
 
   const fetchUserData = async (userId: string) => {
     setLoading(true);
@@ -138,6 +143,7 @@ export default function ProfilePage() {
 
         const genreCounts: { [key: string]: number } = {};
         const actorCounts: { [key: string]: number } = {};
+        const directorCounts: { [key: string]: number } = {};
 
         likedItems.forEach((item: any) => {
           if (item.genres) {
@@ -152,15 +158,23 @@ export default function ProfilePage() {
               if (person) actorCounts[person] = (actorCounts[person] || 0) + 1;
             });
           }
+          if (item.director) {
+            item.director.split(',').forEach((d: string) => {
+              const dir = d.trim();
+              if (dir) directorCounts[dir] = (directorCounts[dir] || 0) + 1;
+            });
+          }
         });
 
         const sortedGenres = Object.keys(genreCounts).sort((a, b) => genreCounts[b] - genreCounts[a]).slice(0, 3);
         const sortedActors = Object.keys(actorCounts).sort((a, b) => actorCounts[b] - actorCounts[a]).slice(0, 3);
+        const sortedDirectors = Object.keys(directorCounts).sort((a, b) => directorCounts[b] - directorCounts[a]).slice(0, 3);
 
+        // Remplacement des fausses données écrites en dur par de vraies analyses
         setPantheon({
-          topGenres: sortedGenres.length > 0 ? sortedGenres : ['Science-Fiction', 'Action', 'Thriller'],
-          topDirectors: ['Christopher Nolan', 'Denis Villeneuve'],
-          topActors: sortedActors.length > 0 ? sortedActors : ['Cillian Murphy', 'Keanu Reeves'],
+          topGenres: sortedGenres.length > 0 ? sortedGenres : ['Données insuffisantes'],
+          topDirectors: sortedDirectors.length > 0 ? sortedDirectors : ['Données insuffisantes'],
+          topActors: sortedActors.length > 0 ? sortedActors : ['Données insuffisantes'],
         });
       }
 
@@ -244,7 +258,7 @@ export default function ProfilePage() {
         setFriends([]);
       }
 
-      // 6. Demandes d'amis en attente (reçues où l'utilisateur est le friend_id)
+      // 6. Demandes d'amis en attente
       const { data: pendingData } = await supabase
         .from('friendships')
         .select('*')
@@ -308,7 +322,7 @@ export default function ProfilePage() {
     reader.onloadend = () => {
       setAvatarUrl(reader.result as string);
       setUploadingImage(false);
-    };
+    }
     reader.onerror = () => {
       alert("Erreur lors de la lecture de l'image.");
       setUploadingImage(false);
@@ -367,7 +381,6 @@ export default function ProfilePage() {
         return;
       }
 
-      // Vérifier si une relation existe déjà
       const { data: existing } = await supabase
         .from('friendships')
         .select('*')
@@ -547,7 +560,7 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* BANDEAU AMIS & DUO (AVEC JAUGE DE COMPATIBILITÉ ET DEMANDES EN ATTENTE) */}
+            {/* BANDEAU AMIS & DUO */}
             <div style={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '24px', padding: '20px', marginBottom: '24px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#3B82F6', margin: '0 0 10px 0' }}>👥 Mes Amis & Duo</h3>
 
@@ -557,7 +570,7 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* DEMANDES REÇUES (EN ATTENTE) */}
+              {/* DEMANDES REÇUES */}
               {pendingRequests.length > 0 && (
                 <div style={{ marginBottom: '20px', backgroundColor: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '16px', padding: '16px' }}>
                   <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#FBBF24', margin: '0 0 10px 0' }}>🔔 Demandes reçues ({pendingRequests.length})</h4>
