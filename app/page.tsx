@@ -64,7 +64,7 @@ function SkeletonCard() {
 }
 
 // 🔮 COMPOSANT DE L'ORACLE POTE-CORN (IA SUR-MESURE)
-function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (movie: any) => void }) {
+function AiOracleCard({ userId, userWatchlist, onOpenMovie }: { userId: string; userWatchlist: any[]; onOpenMovie: (movie: any) => void }) {
   const [oracleText, setOracleText] = useState<string>('Analyse de ton profil cinéphile en cours...');
   const [suggestedMovie, setSuggestedMovie] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -72,13 +72,6 @@ function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (m
   useEffect(() => {
     const generatePersonalizedAdvice = async () => {
       try {
-        const { data: swipes } = await supabase
-          .from('user_swipes')
-          .select('*')
-          .eq('user_uid', userId)
-          .eq('action', 'liked')
-          .limit(10);
-
         const { data: profile } = await supabase
           .from('profiles')
           .select('username')
@@ -93,11 +86,17 @@ function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (m
         else if (currentHour >= 12 && currentHour < 18) timeContext = "cet après-midi";
         else if (currentHour >= 22 || currentHour < 5) timeContext = "tard dans la nuit";
 
+        // Récupérer la liste des titres déjà vus pour les interdire formellement à l'IA
+        const watchedTitles = userWatchlist
+          .filter(w => w.status === 'watched')
+          .map(w => w.title)
+          .filter(Boolean);
+
         const res = await fetch('/api/ai-recommend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            prompt: `Génère un conseil ciné personnalisé et court pour ${pseudo} qui se connecte ${timeContext}. Il aime ces films/genres: ${JSON.stringify(swipes?.map(s => s.title))}. Donne-lui l'impression que tu le connais par cœur.`,
+            prompt: `Génère un conseil ciné personnalisé et court pour ${pseudo} qui se connecte ${timeContext}. IMPORTANT : Ne recommandes JAMAIS un film ou une série déjà vu(e) par l'utilisateur. Voici la liste exacte des films qu'il a DÉJÀ VUS et qu'il ne faut SURTOUT PAS recommander : ${JSON.stringify(watchedTitles)}. Propose-lui une NOUVEAUTÉ qu'il n'a pas encore vue.`,
             mediaType: 'movie' 
           }),
         });
@@ -105,7 +104,12 @@ function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (m
         const data = await res.json();
         
         if (data && data.recommendations && data.recommendations.length > 0) {
-          const rec = data.recommendations[0];
+          // Filtrage de sécurité additionnel côté client
+          const validRecs = data.recommendations.filter((rec: any) => 
+            !watchedTitles.some(watched => watched?.toLowerCase() === rec.title?.toLowerCase())
+          );
+
+          const rec = validRecs.length > 0 ? validRecs[0] : data.recommendations[0];
           setOracleText(rec.reason);
 
           const tmdbRes = await fetch(`/api/tmdb?endpoint=/search/movie&language=fr-FR&include_adult=false&query=${encodeURIComponent(rec.title)}&page=1`);
@@ -114,7 +118,7 @@ function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (m
             setSuggestedMovie(tmdbData.results[0]);
           }
         } else {
-          setOracleText(`Salut ${pseudo} ! Swipe quelques films pour que je puisse cerner tes goûts et te concocter des recommandations sur-mesure.`);
+          setOracleText(`Salut ${pseudo} ! Marque tes films vus pour que je puisse te proposer de vraies découvertes.`);
         }
       } catch (err) {
         console.error("Erreur Oracle IA:", err);
@@ -127,7 +131,7 @@ function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (m
     if (userId) {
       generatePersonalizedAdvice();
     }
-  }, [userId]);
+  }, [userId, userWatchlist]);
 
   if (loading) {
     return (
@@ -181,7 +185,7 @@ function AiOracleCard({ userId, onOpenMovie }: { userId: string; onOpenMovie: (m
             />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: '9px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase' }}>Coup de cœur du moment :</span>
+            <span style={{ fontSize: '9px', fontWeight: '800', color: '#FBBF24', textTransform: 'uppercase' }}>Découverte suggérée :</span>
             <h4 style={{ fontSize: '13px', fontWeight: '800', margin: '2px 0 2px 0', color: '#FFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {suggestedMovie.title}
             </h4>
@@ -939,7 +943,7 @@ export default function HomePage() {
 
         {/* 🔮 ORACLE POTE-CORN (IA SUR-MESURE) */}
         {currentUserId && (
-          <AiOracleCard userId={currentUserId} onOpenMovie={openMediaModal} />
+          <AiOracleCard userId={currentUserId} userWatchlist={userWatchlist} onOpenMovie={openMediaModal} />
         )}
 
         {/* BARRE DE RECHERCHE RAPIDE */}
